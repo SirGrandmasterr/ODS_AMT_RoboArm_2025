@@ -4,7 +4,8 @@ namespace UnityFactorySceneHDRP
 {
 	public class CameraMove : MonoBehaviour
 	{
-		[SerializeField] private CharacterController _characterController;
+		// --- REPLACED CharacterController with Rigidbody ---
+		[SerializeField] private Rigidbody _rigidbody;
 		[SerializeField] private Transform _playerRoot;
 		[SerializeField] private Transform _camera;
 
@@ -27,6 +28,11 @@ namespace UnityFactorySceneHDRP
 		private bool _isRunning = false;
 		private bool _isWalkMode = true;
 
+		// --- ADDED: Input storage for FixedUpdate ---
+		private Vector3 _moveDir;
+		private float _verticalInput;
+		private float _currentSpeed;
+
 		/// <summary>
 		/// Manages the camera's current behavior state.
 		/// </summary>
@@ -47,6 +53,22 @@ namespace UnityFactorySceneHDRP
 		{
 			_yaw = _playerRoot.eulerAngles.y;
 			_tilt = _camera.localEulerAngles.x;
+
+			// --- ADDED: Rigidbody check ---
+			if (_rigidbody == null)
+			{
+				Debug.LogError("Rigidbody is not assigned on CameraMove script!", this);
+				_playerRoot.GetComponent<Rigidbody>(); // Try to find it
+			}
+			if (_rigidbody == null)
+			{
+				Debug.LogError("Could not find Rigidbody on PlayerRoot. Movement will fail.", this);
+			}
+			else
+			{
+				// Set initial gravity state
+				_rigidbody.useGravity = _isWalkMode;
+			}
 		}
 
 		private void Update()
@@ -63,8 +85,9 @@ namespace UnityFactorySceneHDRP
 					{
 						_currentState = CameraState.Locked;
 
-						// Disable controller to teleport
-						_characterController.enabled = false;
+						// --- MODIFIED: Use Rigidbody properties ---
+						// Disable physics simulation
+						_rigidbody.isKinematic = true; 
 						
 						// Set player root position and rotation from the target
 						_playerRoot.position = _lockedCameraTarget.position;
@@ -75,9 +98,6 @@ namespace UnityFactorySceneHDRP
 						_camera.localPosition = Vector3.zero;
 						_camera.localRotation = Quaternion.identity;
 						_tilt = 0; // Reset tilt tracker
-
-						// Re-enable controller
-						_characterController.enabled = true;
 					}
 					else
 					{
@@ -88,6 +108,9 @@ namespace UnityFactorySceneHDRP
 				{
 					// --- Switch TO FreeMove ---
 					_currentState = CameraState.FreeMove;
+					// --- MODIFIED: Use Rigidbody properties ---
+					// Re-enable physics simulation
+					_rigidbody.isKinematic = false; 
 					// Restore camera height based on current mode
 					RestoreCameraHeight();
 				}
@@ -98,16 +121,22 @@ namespace UnityFactorySceneHDRP
 			{
 				_isWalkMode = !_isWalkMode;
 
+				// --- MODIFIED: Use Rigidbody properties ---
+				// Update physics settings for the new mode
+				_rigidbody.useGravity = _isWalkMode;
+				_rigidbody.linearVelocity = Vector3.zero; // Stop all movement on switch
+
 				// Apply new mode logic
 				if (_isWalkMode)
 				{
-					_playerRoot.position = new Vector3(_playerRoot.position.x, _minWorldY, _playerRoot.position.z);
+					// Safely teleport to the ground
+					_rigidbody.MovePosition(new Vector3(_playerRoot.position.x, _minWorldY, _playerRoot.position.z));
 					_camera.localPosition = new Vector3(0, _walkModeCameraHeight, 0);
 				}
 				else
 				{
 					// When switching to fly mode, root Y should match camera Y
-					_playerRoot.position = new Vector3(_playerRoot.position.x, _camera.position.y, _playerRoot.position.z);
+					_rigidbody.MovePosition(new Vector3(_playerRoot.position.x, _camera.position.y, _playerRoot.position.z));
 					_camera.localPosition = Vector3.zero;
 				}
 
@@ -115,13 +144,15 @@ namespace UnityFactorySceneHDRP
 				if (_currentState == CameraState.Locked)
 				{
 					_currentState = CameraState.FreeMove;
+					_rigidbody.isKinematic = false; // Ensure physics is re-enabled
 				}
 			}
 
 			// --- Execute Logic Based on Current State ---
 			if (_currentState == CameraState.FreeMove)
 			{
-				HandleFreeMove();
+				// HandleFreeMove now just GATHERS input in Update()
+				HandleFreeMove_GatherInput();
 			}
 			else // _currentState == CameraState.Locked
 			{
@@ -129,18 +160,71 @@ namespace UnityFactorySceneHDRP
 			}
 		}
 
+		// --- ADDED: FixedUpdate for all physics ---
 		/// <summary>
-		/// Handles all player movement and rotation logic when in FreeMove state.
+		/// Handles all physics-based movement and rotation.
 		/// </summary>
-		private void HandleFreeMove()
+		private void FixedUpdate()
 		{
-			// Rotate
+			// Don't move if not in free move state
+			if (_currentState != CameraState.FreeMove)
+			{
+				return;
+			}
+
+			// --- Apply Rotation ---
+			// We use MoveRotation for smooth, physics-safe rotation
+			Quaternion targetRotation = Quaternion.Euler(0, _yaw, 0);
+			_rigidbody.MoveRotation(targetRotation);
+
+			// --- Apply Movement ---
+			if (_isWalkMode)
+			{
+				// Walk Mode
+				// Convert local input direction to world-space direction based on player's rotation
+				Vector3 worldMoveDir = _playerRoot.TransformDirection(_moveDir);
+				Vector3 targetVelocity = worldMoveDir * _currentSpeed;
+
+				// Set velocity, but PRESERVE existing Y (vertical) velocity (for gravity)
+				_rigidbody.linearVelocity = new Vector3(targetVelocity.x, _rigidbody.linearVelocity.y, targetVelocity.z);
+			}
+			else
+			{
+				// Fly Mode
+				// Add vertical input
+				Vector3 localMoveDir = _moveDir;
+				localMoveDir.y = _verticalInput;
+
+				// Convert local input (including Y) to world space based on *camera's* rotation
+				Vector3 worldMoveDir = _camera.transform.TransformDirection(localMoveDir);
+				Vector3 targetVelocity = worldMoveDir * _currentSpeed;
+
+				// Set velocity directly. Gravity is off, so we control all 3 axes.
+				_rigidbody.linearVelocity = targetVelocity;
+
+				// Clamp to min world Y
+				if (_rigidbody.position.y < _minWorldY)
+				{
+					_rigidbody.MovePosition(new Vector3(_rigidbody.position.x, _minWorldY, _rigidbody.position.z));
+					// Stop Y velocity if we hit the floor
+					_rigidbody.linearVelocity = new Vector3(_rigidbody.linearVelocity.x, 0, _rigidbody.linearVelocity.z);
+				}
+			}
+		}
+
+		/// <summary>
+		/// GATHERS all player inputs when in FreeMove state.
+		/// Movement is APPLIED in FixedUpdate().
+		/// </summary>
+		private void HandleFreeMove_GatherInput()
+		{
+			// Rotate (Mouse Look)
 			if (Input.GetMouseButton(1))
 			{
 				_yaw += Input.GetAxis("Mouse X") * _rotateSpeed;
 				_tilt -= Input.GetAxis("Mouse Y") * _rotateSpeed;
 				_tilt = Mathf.Clamp(_tilt, -89, 89);
-				_playerRoot.eulerAngles = new Vector3(0, _yaw, 0);
+				// Rotation is applied in FixedUpdate, but camera tilt is visual-only
 				_camera.localEulerAngles = new Vector3(_tilt, 0, 0);
 			}
 
@@ -150,48 +234,28 @@ namespace UnityFactorySceneHDRP
 				_isRunning = !_isRunning;
 			}
 
-			// Prepare Move Inputs
-			Vector3 dir = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
-			float verticalInput = (Input.GetKey(KeyCode.Q) ? -1f : 0) + (Input.GetKey(KeyCode.E) ? 1f : 0);
-			float currentSpeed = _moveSpeed * (_isRunning ? 3 : 1);
+			// --- MODIFIED: Store inputs for FixedUpdate ---
+			_moveDir = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
+			_verticalInput = (Input.GetKey(KeyCode.Q) ? -1f : 0) + (Input.GetKey(KeyCode.E) ? 1f : 0);
+			_currentSpeed = _moveSpeed * (_isRunning ? 3 : 1);
 
 			// Apply Movement
 			if (_isWalkMode)
 			{
-				// Walk Mode (SimpleMove for XZ, manual Y)
-				dir = Quaternion.Euler(0, _playerRoot.localEulerAngles.y, 0) * dir;
-				_characterController.SimpleMove(dir * currentSpeed);
-
-				// Apply Q/E height change
-				float height = Mathf.Max(0, _camera.localPosition.y + verticalInput * _moveSpeed * Time.deltaTime);
+				// Apply Q/E height change (visual only, moves camera up/down)
+				float height = Mathf.Max(0, _camera.localPosition.y + _verticalInput * _moveSpeed * Time.deltaTime);
 				_camera.localPosition = new Vector3(0, height, 0);
 			}
-			else
-			{
-				// Fly Mode (Move for XYZ)
-				// Add vertical input to direction vector
-				dir.y = verticalInput;
-
-				dir = Quaternion.Euler(_camera.localEulerAngles.x, _playerRoot.localEulerAngles.y, _camera.localEulerAngles.z) * dir;
-				_characterController.Move(dir * currentSpeed * Time.deltaTime);
-			}
-
-			// Clamp to min world Y
-			if (_playerRoot.position.y < _minWorldY)
-			{
-				Vector3 position = _playerRoot.position;
-				position.y = _minWorldY;
-				_playerRoot.position = position;
-			}
+			// All other movement logic is now in FixedUpdate
 		}
 
 		/// <summary>
-		/// Handles logic when in Locked state. Currently does nothing, as requested.
+		/// Handles logic when in Locked state.
 		/// </summary>
 		private void HandleLockedState()
 		{
 			// Do nothing. All movement and rotation is disabled.
-			// State change logic is handled in Update().
+			// Rigidbody is Kinematic, so it won't be affected by physics.
 		}
 
 		/// <summary>
@@ -210,4 +274,3 @@ namespace UnityFactorySceneHDRP
 		}
 	}
 }
-
