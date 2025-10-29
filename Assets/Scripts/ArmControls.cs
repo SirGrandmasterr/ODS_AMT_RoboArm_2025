@@ -15,13 +15,11 @@ public class ArmControls : MonoBehaviour
 
     public Transform smallSegment;
     public Transform smallSegmentDrill;
-
-    // --- ADDED ---
+    
     [Tooltip("Reference to the first claw component.")]
     public Transform claw1;
     [Tooltip("Reference to the second claw component.")]
     public Transform claw2;
-    // --- END OF ADDED CODE ---
 
     [Tooltip("How fast the parts rotate.")]
     public float rotationSpeed = 45.0f;
@@ -33,21 +31,16 @@ public class ArmControls : MonoBehaviour
     [Header("State Control")]
     [Tooltip("Reference to the CameraMove script on the player. Controls will only activate when the camera is locked.")]
     public CameraMove playerCameraMove; 
-
-    // --- PRIVATE FIELDS ---
-
+    
     // The current rotation values for each part.
     private float BaseYRotation = 0.0f;
     private float LargeSegmentRotation = 0.0f;
     private float SmallSegmentRotation = 0.0f;
     private float SmallSegmentClawRotation = 0.0f;
-
-    // --- ADDED ---
+    
     // The current target rotation values for the claws.
     private float claw1XRotation = -90.0f; // Default to open state
     private float claw2XRotation = 90.0f;  // Default to open state
-    // --- END OF ADDED CODE ---
-
     
     void Start()
     {
@@ -69,7 +62,6 @@ public class ArmControls : MonoBehaviour
             SmallSegmentClawRotation = smallSegmentDrill.localEulerAngles.y;
         }
         
-        // --- ADDED ---
         // Initialize claw rotations to their default (open) state.
         // We set the target here, and Update() will move them into position.
         if (claw1 != null)
@@ -80,8 +72,6 @@ public class ArmControls : MonoBehaviour
         {
             claw2XRotation = 90.0f;
         }
-        // --- END OF ADDED CODE ---
-
         if (playerCameraMove == null)
         {
             Debug.LogWarning("ArmControls: 'Player Camera Move' reference is not set. Arm controls will be disabled.", this);
@@ -117,10 +107,8 @@ public class ArmControls : MonoBehaviour
         {
             LargeSegmentRotation += rotationSpeed * Time.deltaTime;
         }
-
-        // --- Clamp the first segment's rotation ---
+        
         LargeSegmentRotation = Mathf.Clamp(LargeSegmentRotation, -firstSegmentAngleLimit, firstSegmentAngleLimit);
-        // --- END OF CLAMP CODE ---
 
         if (Input.GetKey(KeyCode.UpArrow))
         {
@@ -140,8 +128,6 @@ public class ArmControls : MonoBehaviour
             SmallSegmentClawRotation += rotationSpeed * Time.deltaTime;
         }
         
-        // --- ADDED: Claw Controls ---
-        
         // Check for Space (Grab) - but not if Shift is also held
         if (Input.GetKeyDown(KeyCode.Space) && !Input.GetKey(KeyCode.LeftShift) && !Input.GetKey(KeyCode.RightShift))
         {
@@ -157,7 +143,7 @@ public class ArmControls : MonoBehaviour
             claw1XRotation = -90.0f;
             claw2XRotation = 90.0f;
         }
-        // --- END OF ADDED CODE ---
+
 
 
         // --- APPLY ROTATIONS ---
@@ -170,7 +156,6 @@ public class ArmControls : MonoBehaviour
 
         if (firstSegment != null)
         {
-            // This will now use the clamped LargeSegmentRotation value
             firstSegment.localRotation = Quaternion.Euler(0f, LargeSegmentRotation, 0f);
         }
         if (smallSegment != null)
@@ -184,7 +169,7 @@ public class ArmControls : MonoBehaviour
             smallSegmentDrill.localRotation = Quaternion.Euler(0f, SmallSegmentClawRotation, 0f);
         }
 
-        // --- ADDED: Apply Claw Rotations ---
+
         
         if (claw1 != null)
         {
@@ -201,6 +186,5 @@ public class ArmControls : MonoBehaviour
             // Smoothly move from the current rotation towards the target rotation
             claw2.localRotation = Quaternion.Lerp(claw2.localRotation, targetClaw2Rotation, rotationSpeed * Time.deltaTime);
         }
-        // --- END OF ADDED CODE ---
     }
 }
