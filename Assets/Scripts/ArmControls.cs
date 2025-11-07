@@ -6,7 +6,8 @@ public class ArmControls : MonoBehaviour
     private enum ControlMode
     {
         ForwardKinematics,
-        InverseKinematics
+        InverseKinematics,
+        AI
     }
 
     [Header("Arm Components")]
@@ -85,6 +86,12 @@ public class ArmControls : MonoBehaviour
             }
             return;
         }
+        
+        if (currentMode == ControlMode.AI)
+        {
+            // AI is in control, player input is disabled
+            return;
+        }
 
         if (!isArmControlActive)
         {
@@ -110,12 +117,12 @@ public class ArmControls : MonoBehaviour
 
     void LateUpdate()
     {
-        if (!isArmControlActive)
+        if (currentMode != ControlMode.ForwardKinematics && !isArmControlActive && currentMode != ControlMode.AI)
         {
             return;
         }
 
-        if (currentMode == ControlMode.InverseKinematics)
+        if (currentMode == ControlMode.InverseKinematics || currentMode == ControlMode.AI)
         {
             SolveIK();
         }
@@ -281,6 +288,81 @@ public class ArmControls : MonoBehaviour
             
             UIManager.Instance.ShowNotification("Forward Kinematics Active (K to toggle)\nControl joints with WASD, Arrows");
         }
+    }
+
+    // --- METHODS FOR AI CONTROL ---
+
+    public void SetAiControl(bool isAiControlled)
+    {
+        if (isAiControlled)
+        {
+            currentMode = ControlMode.AI;
+            if (ikTargetInstance == null)
+            {
+                ikTargetInstance = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                ikTargetTransform = ikTargetInstance.transform;
+                ikTargetTransform.localScale = Vector3.one * 0.1f;
+                Destroy(ikTargetInstance.GetComponent<Collider>());
+                Renderer rend = ikTargetInstance.GetComponent<Renderer>();
+                if (ikTargetMaterial != null) rend.material = ikTargetMaterial;
+                else
+                {
+                    rend.material = new Material(Shader.Find("Standard"));
+                    rend.material.color = Color.red;
+                }
+            }
+        }
+        else
+        {
+            currentMode = ControlMode.ForwardKinematics;
+            if (ikTargetInstance != null)
+            {
+                Destroy(ikTargetInstance);
+                ikTargetInstance = null;
+                ikTargetTransform = null;
+            }
+        }
+    }
+
+    public Transform GetIKTarget()
+    {
+        return ikTargetTransform;
+    }
+
+    public void MoveIkTarget_AI(Vector3 velocity)
+    {
+        if (currentMode == ControlMode.AI && ikTargetTransform != null)
+        {
+            ikTargetTransform.Translate(velocity * Time.deltaTime, Space.World);
+        }
+    }
+
+    public void SetIkTargetPosition_AI(Vector3 worldPosition)
+    {
+        if (ikTargetTransform != null)
+        {
+            ikTargetTransform.position = worldPosition;
+        }
+    }
+
+    public void SetClawState_AI(bool open)
+    {
+        if (open)
+        {
+            claw1XRotation = -90.0f;
+            claw2XRotation = 90.0f;
+        }
+        else
+        {
+            claw1XRotation = -28.0f;
+            claw2XRotation = 28.0f;
+        }
+    }
+
+    public float GetClawState()
+    {
+        // Return 1.0f for open, 0.0f for closed
+        return Mathf.InverseLerp(-28.0f, -90.0f, claw1XRotation);
     }
 
     private void SolveIK()

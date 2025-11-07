@@ -1,0 +1,27 @@
+
+[project]
+name = "roboarmml"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "phi42197",email = "phillip.vogler@fokus.fraunhofer.de"}
+]
+readme = "README.md"
+requires-python = "<=3.10.12,>=3.10.1"
+dependencies = [
+    "fsspec (>=2025.9.0,<2026.0.0)",
+    "mlagents (>=1.1.0,<2.0.0)",
+    "mlagents-envs (>=1.1.0,<2.0.0)",
+    "onnx (==1.15.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.source]]
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu121"
+priority = "supplemental"
+
