@@ -1,0 +1,15 @@
+Things that currently work:
+- Arm exists
+- Arm can be steered manually with front kinematics and inverse kinematics
+- Arm can start training process
+- Arm can grab and release bottle
+
+Training process problems:
+- Arms tend to fully stretch and only grab bottle via incompetence. 
+- Multistep very hard?
+
+
+Experiment TODO:
+- Penalty for clamping necessity. Maybe remove clamp and use penalty only.
+- Adjust clamping center. Add clamp gizmo.
+- Figure out how to make arm release at the right point

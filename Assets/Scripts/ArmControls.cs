@@ -46,6 +46,18 @@ public class ArmControls : MonoBehaviour
     [Tooltip("Optional: A red material for the spawned IK target ball.")]
     public Material ikTargetMaterial;
 
+    [Space(10)]
+    [Tooltip("The maximum distance the IK target can be from the arm's base. (0 = no limit)")]
+    public float maxIkTargetReach = 2.5f;
+    [Tooltip("The minimum distance the IK target can be from the arm's base. (0 = no limit)")]
+    public float minIkTargetReach = 0.5f;
+
+    [Space(10)]
+    [Header("Grabbing")]
+    [Tooltip("The radius around the end effector to check for objects to grab.")]
+    public float grabRadius = 0.1f;
+
+
     private float BaseYRotation = 0.0f;
     private float LargeSegmentRotation = 0.0f;
     private float SmallSegmentRotation = 0.0f;
@@ -60,6 +72,11 @@ public class ArmControls : MonoBehaviour
     private Transform ikTargetTransform;
     private bool isArmControlActive = false;
 
+    // --- New variables for manual grabbing ---
+    private Rigidbody endEffectorRb;
+    private FixedJoint heldObjectJoint;
+    private Rigidbody heldObjectRb;
+
     void Start()
     {
         if (playerCameraMove == null)
@@ -71,6 +88,21 @@ public class ArmControls : MonoBehaviour
         if (claw2 != null) claw2XRotation = 90.0f;
 
         SyncFKVariablesToArmPose();
+
+        // --- Add Rigidbody to End Effector for grabbing ---
+        if (endEffector != null)
+        {
+            endEffectorRb = endEffector.GetComponent<Rigidbody>();
+            if (endEffectorRb == null)
+            {
+                endEffectorRb = endEffector.gameObject.AddComponent<Rigidbody>();
+            }
+            endEffectorRb.isKinematic = true;
+        }
+        else if (currentMode != ControlMode.ForwardKinematics)
+        {
+            Debug.LogError("End Effector is not assigned! IK and Grabbing will not work.");
+        }
     }
 
     void Update()
@@ -124,6 +156,12 @@ public class ArmControls : MonoBehaviour
 
         if (currentMode == ControlMode.InverseKinematics || currentMode == ControlMode.AI)
         {
+            // --- NEW ---
+            // Clamp the target's position *before* solving.
+            // This guarantees the solver never gets an unreachable target.
+            ClampIkTarget();
+            // -----------
+
             SolveIK();
         }
         else 
@@ -160,6 +198,44 @@ public class ArmControls : MonoBehaviour
             claw2.localRotation = Quaternion.Lerp(claw2.localRotation, targetClaw2Rotation, rotationSpeed * Time.deltaTime);
         }
     }
+
+    /// <summary>
+    /// Clamps the IK target's position to be within the min/max reach of the arm's base.
+    /// </summary>
+    private void ClampIkTarget()
+    {
+        if (ikTargetTransform == null || armbase == null) return;
+
+        Vector3 basePos = armbase.position;
+        Vector3 targetPos = ikTargetTransform.position;
+        Vector3 toTarget = targetPos - basePos;
+        float distance = toTarget.magnitude;
+
+        // --- Handle Max Reach ---
+        // If maxIkTargetReach is set (greater than 0) and we are too far
+        if (maxIkTargetReach > 0 && distance > maxIkTargetReach)
+        {
+            // Pull the target back to the edge of the sphere
+            ikTargetTransform.position = basePos + toTarget.normalized * maxIkTargetReach;
+        }
+        // --- Handle Min Reach ---
+        // If minIkTargetReach is set and we are too close
+        else if (minIkTargetReach > 0 && distance < minIkTargetReach)
+        {
+            // Check if we are right *at* the center (to avoid divide-by-zero)
+            if (distance < 0.001f)
+            {
+                // Push the target out in a default direction (e.g., forward relative to the base)
+                ikTargetTransform.position = basePos + armbase.forward * minIkTargetReach;
+            }
+            else
+            {
+                // Push the target out to the inner edge of the sphere
+                ikTargetTransform.position = basePos + toTarget.normalized * minIkTargetReach;
+            }
+        }
+    }
+
 
     private void HandleForwardKinematicsInput()
     {
@@ -225,14 +301,23 @@ public class ArmControls : MonoBehaviour
         if (Input.GetKey(KeyCode.Q)) moveDelta -= Vector3.up;    // World Down
 
         ikTargetTransform.Translate(moveDelta * ikTargetMoveSpeed * Time.deltaTime, Space.World);
+        // We no longer need to call ClampIkTarget() here, as LateUpdate handles it.
     }
 
     private void HandleClawInput()
     {
+        // Check for Space (Grab)
         if (Input.GetKeyDown(KeyCode.Space) && !Input.GetKey(KeyCode.LeftShift) && !Input.GetKey(KeyCode.RightShift))
         {
             claw1XRotation = -28.0f;
             claw2XRotation = 28.0f;
+            
+            // Only try to grab if not in AI mode
+            if (currentMode != ControlMode.AI)
+            {
+                // Use the new public Grab method
+                Grab();
+            }
         }
 
         // Check for Shift + Space (Release)
@@ -240,6 +325,13 @@ public class ArmControls : MonoBehaviour
         {
             claw1XRotation = -90.0f;
             claw2XRotation = 90.0f;
+
+            // Only try to release if not in AI mode
+            if (currentMode != ControlMode.AI)
+            {
+                // Use the new public Release method
+                Release();
+            }
         }
     }
 
@@ -311,6 +403,8 @@ public class ArmControls : MonoBehaviour
                     rend.material.color = Color.red;
                 }
             }
+            // Ensure the target is clamped to a valid position when AI takes control
+            ClampIkTarget();
         }
         else
         {
@@ -334,6 +428,7 @@ public class ArmControls : MonoBehaviour
         if (currentMode == ControlMode.AI && ikTargetTransform != null)
         {
             ikTargetTransform.Translate(velocity * Time.deltaTime, Space.World);
+            // We no longer need to call ClampIkTarget() here, as LateUpdate handles it.
         }
     }
 
@@ -342,6 +437,7 @@ public class ArmControls : MonoBehaviour
         if (ikTargetTransform != null)
         {
             ikTargetTransform.position = worldPosition;
+            // We no longer need to call ClampIkTarget() here, as LateUpdate handles it.
         }
     }
 
@@ -364,6 +460,78 @@ public class ArmControls : MonoBehaviour
         // Return 1.0f for open, 0.0f for closed
         return Mathf.InverseLerp(-28.0f, -90.0f, claw1XRotation);
     }
+
+    // --- Public Methods for Grabbing (for Player AND AI) ---
+
+    /// <summary>
+    /// Attempts to grab the nearest dynamic Rigidbody within the grabRadius.
+    /// Returns true if a grab was successful.
+    /// </summary>
+    public bool Grab()
+    {
+        if (heldObjectJoint != null || endEffectorRb == null) return false; // Already holding something or no effector RB
+
+        // Find all colliders near the end effector
+        Collider[] colliders = Physics.OverlapSphere(endEffector.position, grabRadius);
+
+        if (colliders.Length == 0) return false;
+
+        foreach (var col in colliders)
+        {
+            // Find the first non-kinematic Rigidbody
+            Rigidbody rb = col.GetComponent<Rigidbody>();
+            
+            // Ensure we don't grab parts of the arm itself or other kinematic bodies
+            if (rb != null && !rb.isKinematic)
+            {
+                heldObjectRb = rb;
+                heldObjectJoint = heldObjectRb.gameObject.AddComponent<FixedJoint>();
+                heldObjectJoint.connectedBody = endEffectorRb;
+
+                // Notify BottleTarget script if it exists
+                BottleTarget bottleScript = heldObjectRb.GetComponent<BottleTarget>();
+                if (bottleScript != null)
+                {
+                    bottleScript.isHeld = true;
+                }
+                
+                return true; // We grabbed something
+            }
+        }
+
+        return false; // Found no valid object to grab
+    }
+
+    /// <summary>
+    /// Releases any object currently held by the arm.
+    /// </summary>
+    public void Release()
+    {
+        if (heldObjectJoint == null) return; // Not holding anything
+
+        // Notify BottleTarget script if it exists
+        if (heldObjectRb != null)
+        {
+            BottleTarget bottleScript = heldObjectRb.GetComponent<BottleTarget>();
+            if (bottleScript != null)
+            {
+                bottleScript.isHeld = false;
+            }
+        }
+
+        Destroy(heldObjectJoint);
+        heldObjectJoint = null;
+        heldObjectRb = null;
+    }
+
+    /// <summary>
+    /// Checks if the arm is currently holding an object.
+    /// </summary>
+    public bool IsHoldingObject()
+    {
+        return heldObjectJoint != null;
+    }
+
 
     private void SolveIK()
     {
@@ -402,10 +570,6 @@ public class ArmControls : MonoBehaviour
         // Vector3 localEuler = targetLocalRotation.eulerAngles;
         // float WrapAngle(float angle) => (angle > 180f) ? angle - 360f : angle;
         
-        // --- NEW ROBUST METHOD ---
-        // We can't use .eulerAngles because it's unstable near 180-degree poles (like smallSegment).
-        // We must analytically extract the one rotation axis we care about from the quaternion.
-
         if (joint == armbase)
         {
             // Rotation is (0, Y, 0) -> q = (0, sin(p), 0, cos(p))

@@ -1,0 +1,29 @@
+{
+    "RoboArm": {
+        "checkpoints": [
+            {
+                "steps": 272342,
+                "file_path": "results/ppo/RoboArm/RoboArm-272342.onnx",
+                "reward": null,
+                "creation_time": 1762736503.9275684,
+                "auxillary_file_paths": [
+                    "results/ppo/RoboArm/RoboArm-272342.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 272342,
+            "file_path": "results/ppo/RoboArm.onnx",
+            "reward": null,
+            "creation_time": 1762736503.9275684,
+            "auxillary_file_paths": [
+                "results/ppo/RoboArm/RoboArm-272342.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.1.0",
+        "torch_version": "2.2.2+cu121"
+    }
+}
