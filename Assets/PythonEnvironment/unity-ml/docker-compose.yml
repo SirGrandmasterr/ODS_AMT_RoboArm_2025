@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    # Build the image from the Dockerfile in the current directory
+    build: .
+    # Name the resulting image
+    image: unity-ml-backend:latest
+    
+    # IMPORTANT: This block is required for GPU access
+    # This requires the nvidia-container-toolkit to be installed on the host machine.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: ["gpu"]
+              count: all
+                       
+    # Change the command to match your application's entrypoint
+    # This should match the CMD in your Dockerfile
+    command: ["python", "src/main.py"]
+
+    # Expose ports if your application is a server
+    # Example: Map host port 8000 to container port 8000
+    ports:
+       - "5004:5004"
+
+    # Uncomment the line below to mount your local code for development
+    # This will overwrite the code in the image with your local code
+    # volumes:
+    #   - ./src:/app/src
