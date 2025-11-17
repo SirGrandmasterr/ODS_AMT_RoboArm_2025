@@ -40,7 +40,7 @@ behaviors:
     even_checkpoints: false
     max_steps: 10000000
     time_horizon: 64
-    summary_freq: 10000
+    summary_freq: 50000
     threaded: false
     self_play: null
     behavioral_cloning: null
@@ -64,7 +64,61 @@ engine_settings:
   capture_frame_rate: 60
   no_graphics: false
   no_graphics_monitor: false
-environment_parameters: null
+environment_parameters:
+  lesson_number:
+    curriculum:
+    - value:
+        sampler_type: constant
+        sampler_parameters:
+          seed: 3543
+          value: 0.0
+      name: Lesson1_Reach
+      completion_criteria:
+        behavior: RoboArm
+        measure: reward
+        min_lesson_length: 100
+        signal_smoothing: true
+        threshold: 0.8
+        require_reset: false
+    - value:
+        sampler_type: constant
+        sampler_parameters:
+          seed: 3544
+          value: 1.0
+      name: Lesson2_Grab
+      completion_criteria:
+        behavior: RoboArm
+        measure: reward
+        min_lesson_length: 100
+        signal_smoothing: true
+        threshold: 0.8
+        require_reset: false
+    - value:
+        sampler_type: constant
+        sampler_parameters:
+          seed: 3545
+          value: 2.0
+      name: Lesson3_Place
+      completion_criteria:
+        behavior: RoboArm
+        measure: reward
+        min_lesson_length: 100
+        signal_smoothing: true
+        threshold: 4.0
+        require_reset: false
+    - value:
+        sampler_type: constant
+        sampler_parameters:
+          seed: 3546
+          value: 3.0
+      name: Lesson4_FullTask
+      completion_criteria:
+        behavior: RoboArm
+        measure: reward
+        min_lesson_length: 100
+        signal_smoothing: true
+        threshold: 4.5
+        require_reset: false
 checkpoint_settings:
   run_id: ppo
   initialize_from: null
