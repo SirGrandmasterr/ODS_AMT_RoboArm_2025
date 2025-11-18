@@ -5,22 +5,58 @@
     "RoboArm": {
         "checkpoints": [
             {
-                "steps": 166909,
-                "file_path": "results/ppo/RoboArm/RoboArm-166909.onnx",
-                "reward": null,
-                "creation_time": 1763352199.5648477,
+                "steps": 499939,
+                "file_path": "results/ppo/RoboArm/RoboArm-499939.onnx",
+                "reward": -0.8059068344257496,
+                "creation_time": 1763446159.5202882,
                 "auxillary_file_paths": [
-                    "results/ppo/RoboArm/RoboArm-166909.pt"
+                    "results/ppo/RoboArm/RoboArm-499939.pt"
+                ]
+            },
+            {
+                "steps": 999961,
+                "file_path": "results/ppo/RoboArm/RoboArm-999961.onnx",
+                "reward": 0.08374050897655537,
+                "creation_time": 1763446362.4272463,
+                "auxillary_file_paths": [
+                    "results/ppo/RoboArm/RoboArm-999961.pt"
+                ]
+            },
+            {
+                "steps": 1499976,
+                "file_path": "results/ppo/RoboArm/RoboArm-1499976.onnx",
+                "reward": 0.3438278382935492,
+                "creation_time": 1763446575.56345,
+                "auxillary_file_paths": [
+                    "results/ppo/RoboArm/RoboArm-1499976.pt"
+                ]
+            },
+            {
+                "steps": 1999987,
+                "file_path": "results/ppo/RoboArm/RoboArm-1999987.onnx",
+                "reward": 0.4404609262004612,
+                "creation_time": 1763446792.774641,
+                "auxillary_file_paths": [
+                    "results/ppo/RoboArm/RoboArm-1999987.pt"
+                ]
+            },
+            {
+                "steps": 2394348,
+                "file_path": "results/ppo/RoboArm/RoboArm-2394348.onnx",
+                "reward": 0.5092087072792963,
+                "creation_time": 1763446976.854193,
+                "auxillary_file_paths": [
+                    "results/ppo/RoboArm/RoboArm-2394348.pt"
                 ]
             }
         ],
         "final_checkpoint": {
-            "steps": 166909,
+            "steps": 2394348,
             "file_path": "results/ppo/RoboArm.onnx",
-            "reward": null,
-            "creation_time": 1763352199.5648477,
+            "reward": 0.5092087072792963,
+            "creation_time": 1763446976.854193,
             "auxillary_file_paths": [
-                "results/ppo/RoboArm/RoboArm-166909.pt"
+                "results/ppo/RoboArm/RoboArm-2394348.pt"
             ]
         }
     },
