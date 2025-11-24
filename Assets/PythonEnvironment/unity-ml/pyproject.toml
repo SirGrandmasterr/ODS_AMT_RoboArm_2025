@@ -1,7 +1,7 @@
 [project]
-name = "unity-ml"
-version = "0.1.0"
-description = ""
+name = "unity-ml-node"
+version = "0.2.0"
+description = "The ephemeral training node launched by the backend"
 authors = [
     {name = "Phillip Vogler",email = "phillip.vogler@fokus.fraunhofer.de"}
 ]
@@ -10,9 +10,9 @@ requires-python = "<=3.10.12,>=3.10.1"
 dependencies = [
     "torch (>=2.2.1,<2.3.0)",
     "mlagents-envs (==1.1.0)",
-    "mlagents (==1.1.0)"
+    "mlagents (==1.1.0)",
+    "tensorboard (>=2.14.0)"
 ]
-
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -22,7 +22,6 @@ build-backend = "poetry.core.masonry.api"
 name = "pytorch-cuda"
 url = "https://download.pytorch.org/whl/cu121"
 priority = "supplemental"
-
 
 [tool.poetry.dependencies]
 torch = {source = "pytorch-cuda"}
