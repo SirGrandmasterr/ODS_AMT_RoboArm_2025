@@ -1,19 +1,15 @@
 /*
- * MODIFIED BOTTLE SCRIPT
- * BottleTarget.cs (Now for Sorting)
+ * MODIFIED BOTTLE SCRIPT (v2 - Curriculum)
+ * BottleTargetSorting_Curriculum.cs
  *
  * Major Changes:
- * 1. Added MaterialType enum and 'material' field.
- * 2. Replaced 'isOverTarget' with 'isOverAluminumBin' and 'isOverPlasticBin'.
- * 3. Replaced 'hasBeenPlaced' with 'hasBeenPlacedCorrectly' and 'hasBeenPlacedIncorrectly'.
- * 4. OnTriggerStay now checks for new tags ("TargetBinAluminum", "TargetBinPlastic") 
- * and sets the correct/incorrect flags based on the bottle's material.
- * 5. Added a 'ResetState()' method for the agent to call OnEpisodeBegin.
+ * 1. Renamed class to 'BottleTargetSorting_Curriculum'.
+ * 2. Changed agent variable type to 'ArmAgentSorting_Curriculum'.
 */
 
 using UnityEngine;
 
-public class BottleTarget : MonoBehaviour
+public class BottleTargetSorting_Curriculum : MonoBehaviour
 {
     // NEW: Define the material types
     public enum MaterialType
@@ -35,14 +31,15 @@ public class BottleTarget : MonoBehaviour
     [HideInInspector]
     public bool isOverPlasticBin = false;
 
-    private ArmAgent_FK agent;
+    // --- UPDATED AGENT TYPE ---
+    private ArmAgentSorting_Curriculum agent;
 
     private void Start()
     {
         // Find the agent in the parent environment
         if (agent == null)
         {
-            agent = GetComponentInParent<ArmAgent_FK>();
+            agent = GetComponentInParent<ArmAgentSorting_Curriculum>();
         }
     }
 

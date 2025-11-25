@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class BottleTarget : MonoBehaviour
 {
-    public ArmAgent agent;
+    public ArmAgent_FK agent;
     public bool isHeld = false;
     public bool hasBeenPlaced = false;
 
@@ -13,7 +13,7 @@ public class BottleTarget : MonoBehaviour
         // Find the agent in the parent environment
         if (agent == null)
         {
-            agent = GetComponentInParent<ArmAgent>();
+            agent = GetComponentInParent<ArmAgent_FK>();
         }
     }
 

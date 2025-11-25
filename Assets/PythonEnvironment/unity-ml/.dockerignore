@@ -1,0 +1,31 @@
+# **Exclude files from the Docker build context to speed up builds**
+
+# **Git**
+
+.git  
+.gitignore
+
+# **Docker**
+
+.dockerignore
+
+# **Python**
+
+pycache/  
+\*.pyc  
+\*.pyo  
+\*.pyd  
+.Python  
+env/  
+venv/  
+.venv/
+
+# **IDE**
+
+.idea/  
+.vscode/
+
+# **Test**
+
+.pytest\_cache/  
+.coverage
