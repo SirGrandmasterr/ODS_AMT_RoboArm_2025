@@ -2,28 +2,6 @@
     "lesson_number": {
         "lesson_num": 0
     },
-    "RoboArm": {
-        "checkpoints": [
-            {
-                "steps": 125829,
-                "file_path": "results/ppo/RoboArm/RoboArm-125829.onnx",
-                "reward": -9.480088710784912,
-                "creation_time": 1763547089.145026,
-                "auxillary_file_paths": [
-                    "results/ppo/RoboArm/RoboArm-125829.pt"
-                ]
-            }
-        ],
-        "final_checkpoint": {
-            "steps": 125829,
-            "file_path": "results/ppo/RoboArm.onnx",
-            "reward": -9.480088710784912,
-            "creation_time": 1763547089.145026,
-            "auxillary_file_paths": [
-                "results/ppo/RoboArm/RoboArm-125829.pt"
-            ]
-        }
-    },
     "metadata": {
         "stats_format_version": "0.3.0",
         "mlagents_version": "1.1.0",
