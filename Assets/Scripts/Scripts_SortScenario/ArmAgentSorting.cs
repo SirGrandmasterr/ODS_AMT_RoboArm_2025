@@ -384,10 +384,10 @@ public class ArmAgentSorting_Curriculum : Agent
             claw2XRotation = 28.0f;
             
             // Only try to grab if not in Lesson 3 (where we start by holding)
-            if (lesson_number != 2f)
+            if (lesson_number != 2f && !wasHolding)
             {
                 bool didGrab = Grab();
-                if (didGrab && !wasHolding) // Only reward on the *first* frame of grabbing
+                if (didGrab) // Only reward on the *first* frame of grabbing
                 {
                     if (lesson_number == 1f) // Lesson 2: Grabbing
                     {

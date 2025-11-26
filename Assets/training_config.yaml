@@ -1,0 +1,74 @@
+behaviors:
+  RoboArm:
+    trainer_type: ppo
+    hyperparameters:
+      batch_size: 1024
+      buffer_size: 10240
+      learning_rate: 0.0003
+      beta: 0.005
+      epsilon: 0.2
+      lambd: 0.95
+      num_epoch: 3
+      learning_rate_schedule: linear
+    network_settings:
+      normalize: true
+      hidden_units: 512
+      num_layers: 3
+      vis_encode_type: simple
+    reward_signals:
+      extrinsic:
+        gamma: 0.99
+        strength: 1.0
+    max_steps: 10000000
+    time_horizon: 64
+    summary_freq: 50000
+
+# Define the curriculum via environment parameters.
+
+# Ensure your Unity environment reads "lesson_number"
+
+# (e.g., Academy.Instance.EnvironmentParameters.GetWithDefault("lesson_number", 0.0))
+
+environment_parameters:
+  lesson_number:
+    curriculum:
+
+      - name: Lesson1_Reach
+
+        completion_criteria:
+          measure: reward
+          behavior: RoboArm
+          threshold: 0.8
+          min_lesson_length: 100
+          signal_smoothing: true
+        value: 0.0
+
+      - name: Lesson2_Grab
+
+        completion_criteria:
+          measure: reward
+          behavior: RoboArm
+          threshold: 0.8
+          min_lesson_length: 100
+          signal_smoothing: true
+        value: 1.0
+
+      - name: Lesson3_Place
+
+        completion_criteria:
+          measure: reward
+          behavior: RoboArm
+          threshold: 4.0
+          min_lesson_length: 100
+          signal_smoothing: true
+        value: 2.0
+
+      - name: Lesson4_FullTask
+
+        completion_criteria:
+          measure: reward
+          behavior: RoboArm
+          threshold: 4.5
+          min_lesson_length: 100
+          signal_smoothing: true
+        value: 3.0

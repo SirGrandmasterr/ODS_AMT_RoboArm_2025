@@ -571,7 +571,7 @@ MonoBehaviour:
   scenario2Button: {fileID: 2059639441}
   scenario3Button: {fileID: 2032931566}
   scenario1SceneName: RobotArm
-  scenario2SceneName: Scenario2
+  scenario2SceneName: RobotArmRemote
   scenario3SceneName: Scenario3
 --- !u!114 &194461421
 MonoBehaviour:

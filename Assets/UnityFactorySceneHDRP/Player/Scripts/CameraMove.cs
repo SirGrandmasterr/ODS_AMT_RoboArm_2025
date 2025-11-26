@@ -68,6 +68,8 @@ namespace UnityFactorySceneHDRP
 			{
 				// Set initial gravity state
 				_rigidbody.useGravity = _isWalkMode;
+				// Fix for visual lag/stutter during movement
+				_rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
 			}
 		}
 
