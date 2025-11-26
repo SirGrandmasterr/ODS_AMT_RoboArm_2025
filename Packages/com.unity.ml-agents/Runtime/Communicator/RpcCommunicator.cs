@@ -223,7 +223,7 @@ namespace Unity.MLAgents
         {
             string targetHost = System.Environment.GetEnvironmentVariable("MLAGENTS_HOST") ?? "localhost";
             m_IsOpen = true;
-            m_Channel = new Channel($"http://{targetHost}:{port}", ChannelCredentials.Insecure);
+            m_Channel = new Channel($"{targetHost}:{port}", ChannelCredentials.Insecure);
 
             m_Client = new UnityToExternalProto.UnityToExternalProtoClient(m_Channel);
             var result = m_Client.Exchange(WrapMessage(unityOutput, 200));
