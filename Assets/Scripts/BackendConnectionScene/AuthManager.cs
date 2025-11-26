@@ -16,7 +16,7 @@ public class AuthManager : MonoBehaviour
     public event Action<string> OnRegisterSuccess;
     public event Action<string> OnRegisterFailed;
 
-    private string accessToken;
+    public string AccessToken { get; private set; }
 
     private void Awake()
     {
@@ -54,9 +54,9 @@ public class AuthManager : MonoBehaviour
             if (www.result == UnityWebRequest.Result.Success)
             {
                 var response = JsonConvert.DeserializeObject<TokenResponse>(www.downloadHandler.text);
-                accessToken = response.access_token;
-                Debug.Log($"Login Successful. Token: {accessToken}");
-                OnLoginSuccess?.Invoke(accessToken);
+                AccessToken = response.access_token;
+                Debug.Log($"Login Successful. Token: {AccessToken}");
+                OnLoginSuccess?.Invoke(AccessToken);
             }
             else
             {
