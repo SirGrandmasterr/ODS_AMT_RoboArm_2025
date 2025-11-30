@@ -40,7 +40,7 @@ behaviors:
     even_checkpoints: false
     max_steps: 10000000
     time_horizon: 64
-    summary_freq: 50000
+    summary_freq: 10000
     threaded: false
     self_play: null
     behavioral_cloning: null
@@ -70,7 +70,7 @@ environment_parameters:
     - value:
         sampler_type: constant
         sampler_parameters:
-          seed: 4153
+          seed: 5998
           value: 0.0
       name: Lesson1_Reach
       completion_criteria:
@@ -78,12 +78,12 @@ environment_parameters:
         measure: reward
         min_lesson_length: 100
         signal_smoothing: true
-        threshold: 0.8
+        threshold: 1.5
         require_reset: false
     - value:
         sampler_type: constant
         sampler_parameters:
-          seed: 4154
+          seed: 5999
           value: 1.0
       name: Lesson2_Grab
       completion_criteria:
@@ -91,12 +91,12 @@ environment_parameters:
         measure: reward
         min_lesson_length: 100
         signal_smoothing: true
-        threshold: 0.8
+        threshold: 2.2
         require_reset: false
     - value:
         sampler_type: constant
         sampler_parameters:
-          seed: 4155
+          seed: 6000
           value: 2.0
       name: Lesson3_Place
       completion_criteria:
@@ -104,12 +104,12 @@ environment_parameters:
         measure: reward
         min_lesson_length: 100
         signal_smoothing: true
-        threshold: 4.0
+        threshold: 6.0
         require_reset: false
     - value:
         sampler_type: constant
         sampler_parameters:
-          seed: 4156
+          seed: 6001
           value: 3.0
       name: Lesson4_FullTask
       completion_criteria:
@@ -117,7 +117,7 @@ environment_parameters:
         measure: reward
         min_lesson_length: 100
         signal_smoothing: true
-        threshold: 4.5
+        threshold: 7.0
         require_reset: false
 checkpoint_settings:
   run_id: ppo

@@ -2,6 +2,28 @@
     "lesson_number": {
         "lesson_num": 0
     },
+    "RoboArm": {
+        "checkpoints": [
+            {
+                "steps": 5564,
+                "file_path": "results\\ppo\\RoboArm\\RoboArm-5564.onnx",
+                "reward": -0.029453460025516423,
+                "creation_time": 1764524759.0040214,
+                "auxillary_file_paths": [
+                    "results\\ppo\\RoboArm\\RoboArm-5564.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 5564,
+            "file_path": "results\\ppo\\RoboArm.onnx",
+            "reward": -0.029453460025516423,
+            "creation_time": 1764524759.0040214,
+            "auxillary_file_paths": [
+                "results\\ppo\\RoboArm\\RoboArm-5564.pt"
+            ]
+        }
+    },
     "metadata": {
         "stats_format_version": "0.3.0",
         "mlagents_version": "1.1.0",
