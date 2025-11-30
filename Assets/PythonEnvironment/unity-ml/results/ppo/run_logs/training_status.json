@@ -1,26 +1,62 @@
 {
     "lesson_number": {
-        "lesson_num": 0
+        "lesson_num": 2
     },
     "RoboArm": {
         "checkpoints": [
             {
-                "steps": 5564,
-                "file_path": "results\\ppo\\RoboArm\\RoboArm-5564.onnx",
-                "reward": -0.029453460025516423,
-                "creation_time": 1764524759.0040214,
+                "steps": 4499940,
+                "file_path": "results\\ppo\\RoboArm\\RoboArm-4499940.onnx",
+                "reward": -1.5058449814096093,
+                "creation_time": 1764527418.8736978,
                 "auxillary_file_paths": [
-                    "results\\ppo\\RoboArm\\RoboArm-5564.pt"
+                    "results\\ppo\\RoboArm\\RoboArm-4499940.pt"
+                ]
+            },
+            {
+                "steps": 4999971,
+                "file_path": "results\\ppo\\RoboArm\\RoboArm-4999971.onnx",
+                "reward": -0.33049423578290305,
+                "creation_time": 1764527687.4154212,
+                "auxillary_file_paths": [
+                    "results\\ppo\\RoboArm\\RoboArm-4999971.pt"
+                ]
+            },
+            {
+                "steps": 5499946,
+                "file_path": "results\\ppo\\RoboArm\\RoboArm-5499946.onnx",
+                "reward": 0.3203435449136628,
+                "creation_time": 1764527984.6251004,
+                "auxillary_file_paths": [
+                    "results\\ppo\\RoboArm\\RoboArm-5499946.pt"
+                ]
+            },
+            {
+                "steps": 5999937,
+                "file_path": "results\\ppo\\RoboArm\\RoboArm-5999937.onnx",
+                "reward": -0.13877738519188235,
+                "creation_time": 1764528252.7604828,
+                "auxillary_file_paths": [
+                    "results\\ppo\\RoboArm\\RoboArm-5999937.pt"
+                ]
+            },
+            {
+                "steps": 6415550,
+                "file_path": "results\\ppo\\RoboArm\\RoboArm-6415550.onnx",
+                "reward": -0.7931945441911618,
+                "creation_time": 1764528475.3893228,
+                "auxillary_file_paths": [
+                    "results\\ppo\\RoboArm\\RoboArm-6415550.pt"
                 ]
             }
         ],
         "final_checkpoint": {
-            "steps": 5564,
+            "steps": 6415550,
             "file_path": "results\\ppo\\RoboArm.onnx",
-            "reward": -0.029453460025516423,
-            "creation_time": 1764524759.0040214,
+            "reward": -0.7931945441911618,
+            "creation_time": 1764528475.3893228,
             "auxillary_file_paths": [
-                "results\\ppo\\RoboArm\\RoboArm-5564.pt"
+                "results\\ppo\\RoboArm\\RoboArm-6415550.pt"
             ]
         }
     },

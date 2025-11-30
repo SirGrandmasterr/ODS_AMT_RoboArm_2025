@@ -70,7 +70,7 @@ environment_parameters:
     - value:
         sampler_type: constant
         sampler_parameters:
-          seed: 7056
+          seed: 4329
           value: 0.0
       name: Lesson1_Reach
       completion_criteria:
@@ -83,7 +83,7 @@ environment_parameters:
     - value:
         sampler_type: constant
         sampler_parameters:
-          seed: 7057
+          seed: 4330
           value: 1.0
       name: Lesson2_Grab
       completion_criteria:
@@ -96,7 +96,7 @@ environment_parameters:
     - value:
         sampler_type: constant
         sampler_parameters:
-          seed: 7058
+          seed: 4331
           value: 2.0
       name: Lesson3_Place
       completion_criteria:
@@ -104,12 +104,12 @@ environment_parameters:
         measure: reward
         min_lesson_length: 100
         signal_smoothing: true
-        threshold: 6.0
+        threshold: 5.85
         require_reset: false
     - value:
         sampler_type: constant
         sampler_parameters:
-          seed: 7059
+          seed: 4332
           value: 3.0
       name: Lesson4_FullTask
       completion_criteria:
@@ -120,11 +120,11 @@ environment_parameters:
         threshold: 7.0
         require_reset: false
 checkpoint_settings:
-  run_id: ppo
+  run_id: understanding2
   initialize_from: null
   load_model: false
-  resume: false
-  force: true
+  resume: true
+  force: false
   train_model: false
   inference: false
   results_dir: results

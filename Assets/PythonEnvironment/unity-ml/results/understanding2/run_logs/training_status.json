@@ -1,0 +1,68 @@
+{
+    "lesson_number": {
+        "lesson_num": 3
+    },
+    "RoboArm": {
+        "checkpoints": [
+            {
+                "steps": 3999998,
+                "file_path": "results\\understanding2\\RoboArm\\RoboArm-3999998.onnx",
+                "reward": 1.9161481256954944,
+                "creation_time": 1764540166.8522756,
+                "auxillary_file_paths": [
+                    "results\\understanding2\\RoboArm\\RoboArm-3999998.pt"
+                ]
+            },
+            {
+                "steps": 4499966,
+                "file_path": "results\\understanding2\\RoboArm\\RoboArm-4499966.onnx",
+                "reward": 3.444206973910332,
+                "creation_time": 1764540393.7178986,
+                "auxillary_file_paths": [
+                    "results\\understanding2\\RoboArm\\RoboArm-4499966.pt"
+                ]
+            },
+            {
+                "steps": 4999987,
+                "file_path": "results\\understanding2\\RoboArm\\RoboArm-4999987.onnx",
+                "reward": 7.153446170030848,
+                "creation_time": 1764540685.2626753,
+                "auxillary_file_paths": [
+                    "results\\understanding2\\RoboArm\\RoboArm-4999987.pt"
+                ]
+            },
+            {
+                "steps": 5499987,
+                "file_path": "results\\understanding2\\RoboArm\\RoboArm-5499987.onnx",
+                "reward": 7.214575560061963,
+                "creation_time": 1764541002.8900514,
+                "auxillary_file_paths": [
+                    "results\\understanding2\\RoboArm\\RoboArm-5499987.pt"
+                ]
+            },
+            {
+                "steps": 5753370,
+                "file_path": "results\\understanding2\\RoboArm\\RoboArm-5753370.onnx",
+                "reward": 7.388333270526476,
+                "creation_time": 1764541163.7504299,
+                "auxillary_file_paths": [
+                    "results\\understanding2\\RoboArm\\RoboArm-5753370.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 5753370,
+            "file_path": "results\\understanding2\\RoboArm.onnx",
+            "reward": 7.388333270526476,
+            "creation_time": 1764541163.7504299,
+            "auxillary_file_paths": [
+                "results\\understanding2\\RoboArm\\RoboArm-5753370.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.1.0",
+        "torch_version": "2.2.2+cu121"
+    }
+}
