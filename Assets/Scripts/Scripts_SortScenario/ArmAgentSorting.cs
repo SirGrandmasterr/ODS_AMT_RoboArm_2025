@@ -1,12 +1,14 @@
 /*
- * OPTIMIZED AGENT SCRIPT (v4.4 - No Settle Timer - Manual Debug Mode)
+ * OPTIMIZED AGENT SCRIPT (v4.6 - Early Termination on Bad Drop)
  * ArmAgentSorting_Curriculum.cs
 */
 
+using System;
 using UnityEngine;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
+using Random = UnityEngine.Random;
 
 public class ArmAgentSorting_Curriculum : Agent
 {
@@ -47,7 +49,12 @@ public class ArmAgentSorting_Curriculum : Agent
     [Header("Grabbing Logic")]
     [SerializeField] private float grabRadius = 0.1f;
     [SerializeField] private Rigidbody endEffectorRb;
-
+    
+    [Header("Demo Settings")]
+    public bool isDemoMode = false; // Check this in the Inspector for the Demo Scene
+    public bool isBrainActive = false; // The DemoManager will toggle this
+    public event Action OnJobFinished;
+    
     // --- Private State ---
     private BottleTargetSorting_Curriculum bottleScript;
     private Quaternion initialBottleRot;
@@ -78,6 +85,40 @@ public class ArmAgentSorting_Curriculum : Agent
         Debug.Log($"<color=cyan><b>[Agent]</b> Manual Debug Mode set to: {active}</color>");
         EndEpisode(); // Trigger OnEpisodeBegin to apply changes
     }
+    
+    public void SetDemoBottle(GameObject newBottle)
+    {
+        if (newBottle == null) return;
+        
+        // 1. Update Transforms
+        bottle = newBottle.transform;
+        bottleRb = newBottle.GetComponent<Rigidbody>();
+        bottleScript = newBottle.GetComponent<BottleTargetSorting_Curriculum>();
+        
+        // 2. CRITICAL FIX: Determine the Target Bin based on Material
+        // The Agent needs this to calculate rewards and check for success
+        if (bottleScript != null)
+        {
+            if (bottleScript.material == BottleTargetSorting_Curriculum.MaterialType.Plastic)
+            {
+                currentCorrectTargetBin = targetBinPlastic;
+                // Update renderer if needed for visuals, though likely already set on the prefab
+                if (bottleMeshRenderer && plasticMaterial) bottleMeshRenderer.material = plasticMaterial;
+            }
+            else
+            {
+                currentCorrectTargetBin = targetBinAluminum;
+                if (bottleMeshRenderer && aluminumMaterial) bottleMeshRenderer.material = aluminumMaterial;
+            }
+        }
+        else
+        {
+            Debug.LogError("[Agent] The Demo Bottle is missing the 'BottleTargetSorting_Curriculum' script!");
+        }
+
+        Debug.Log($"[Agent] Demo Bottle Updated. Target Bin set to: {(currentCorrectTargetBin != null ? currentCorrectTargetBin.name : "NULL")}");
+    }
+
 
     public override void Initialize()
     {
@@ -105,6 +146,11 @@ public class ArmAgentSorting_Curriculum : Agent
 
     public override void OnEpisodeBegin()
     {
+        if (isDemoMode)
+        {
+            lesson_number = 3.0f; 
+            return;
+        }
         // Check standard curriculum unless Manual Mode is on
         lesson_number = Academy.Instance.EnvironmentParameters.GetWithDefault("lesson_number", 0f);
 
@@ -162,8 +208,11 @@ public class ArmAgentSorting_Curriculum : Agent
 
     private void SetupLesson_Place()
     {
+        // Place bottle at end effector and set Kinematic=true
         ResetBottlePhysics(endEffector.position, true); 
         RandomizeBottleMaterialAndTarget(); 
+        
+        // Use ForceGrab to attach bottle immediately for the placement lesson
         ForceGrab(bottleRb); 
     }
 
@@ -265,6 +314,7 @@ public class ArmAgentSorting_Curriculum : Agent
 
     public override void OnActionReceived(ActionBuffers actions)
     {
+        if (isDemoMode && !isBrainActive) return;
         float rotationSpeed = 100f; 
         
         currentBaseYRotation += actions.ContinuousActions[0] * Time.fixedDeltaTime * rotationSpeed;
@@ -301,8 +351,27 @@ public class ArmAgentSorting_Curriculum : Agent
             if (wasHolding)
             {
                 Release();
-                // Note: The logic that was previously here for immediate rewards 
-                // is now handled by the Success Check block below to avoid duplication.
+                
+                if (isDemoMode)
+                {
+                    isBrainActive = false; // Shut off immediately
+                    OnJobFinished?.Invoke();
+                }
+                // --- EARLY TERMINATION OPTIMIZATION ---
+                // If we are in the placement phase (Lesson 2+) and we release the bottle
+                // while NOT in a bin zone, we fail immediately.
+                // This prevents wasting time watching the bottle fall to the conveyor.
+                if (!manualDebugMode && lesson_number >= 2f)
+                {
+                    bool isInBinZone = bottleScript.isOverAluminumBin || bottleScript.isOverPlasticBin;
+                    
+                    if (!isInBinZone)
+                    {
+                        AddReward(-1.0f); // Penalty for bad release
+                        EndEpisode();
+                        return; // Stop execution for this step
+                    }
+                }
             }
         }
 
@@ -391,6 +460,8 @@ public class ArmAgentSorting_Curriculum : Agent
         }
         
         // --- FALL CHECK ---
+        // (This runs as a backup if the Early Termination above didn't trigger
+        // or for lessons < 2)
         bool isInBinZone2 = bottleScript.isOverAluminumBin || bottleScript.isOverPlasticBin;
 
         if (!IsHoldingObject() && (bottle.position.y < (bottleSpawnPoint.position.y - 0.5f)))
