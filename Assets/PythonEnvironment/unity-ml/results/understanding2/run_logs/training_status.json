@@ -5,58 +5,58 @@
     "RoboArm": {
         "checkpoints": [
             {
-                "steps": 3999998,
-                "file_path": "results\\understanding2\\RoboArm\\RoboArm-3999998.onnx",
-                "reward": 1.9161481256954944,
-                "creation_time": 1764540166.8522756,
+                "steps": 6999987,
+                "file_path": "results\\understanding2\\RoboArm\\RoboArm-6999987.onnx",
+                "reward": 7.302388027880122,
+                "creation_time": 1764594305.8857572,
                 "auxillary_file_paths": [
-                    "results\\understanding2\\RoboArm\\RoboArm-3999998.pt"
+                    "results\\understanding2\\RoboArm\\RoboArm-6999987.pt"
                 ]
             },
             {
-                "steps": 4499966,
-                "file_path": "results\\understanding2\\RoboArm\\RoboArm-4499966.onnx",
-                "reward": 3.444206973910332,
-                "creation_time": 1764540393.7178986,
+                "steps": 7499998,
+                "file_path": "results\\understanding2\\RoboArm\\RoboArm-7499998.onnx",
+                "reward": 7.42123553995511,
+                "creation_time": 1764594644.5508947,
                 "auxillary_file_paths": [
-                    "results\\understanding2\\RoboArm\\RoboArm-4499966.pt"
+                    "results\\understanding2\\RoboArm\\RoboArm-7499998.pt"
                 ]
             },
             {
-                "steps": 4999987,
-                "file_path": "results\\understanding2\\RoboArm\\RoboArm-4999987.onnx",
-                "reward": 7.153446170030848,
-                "creation_time": 1764540685.2626753,
+                "steps": 7999997,
+                "file_path": "results\\understanding2\\RoboArm\\RoboArm-7999997.onnx",
+                "reward": 7.381550373616362,
+                "creation_time": 1764594942.8125598,
                 "auxillary_file_paths": [
-                    "results\\understanding2\\RoboArm\\RoboArm-4999987.pt"
+                    "results\\understanding2\\RoboArm\\RoboArm-7999997.pt"
                 ]
             },
             {
-                "steps": 5499987,
-                "file_path": "results\\understanding2\\RoboArm\\RoboArm-5499987.onnx",
-                "reward": 7.214575560061963,
-                "creation_time": 1764541002.8900514,
+                "steps": 8499988,
+                "file_path": "results\\understanding2\\RoboArm\\RoboArm-8499988.onnx",
+                "reward": 7.465394261853519,
+                "creation_time": 1764595242.2049067,
                 "auxillary_file_paths": [
-                    "results\\understanding2\\RoboArm\\RoboArm-5499987.pt"
+                    "results\\understanding2\\RoboArm\\RoboArm-8499988.pt"
                 ]
             },
             {
-                "steps": 5753370,
-                "file_path": "results\\understanding2\\RoboArm\\RoboArm-5753370.onnx",
-                "reward": 7.388333270526476,
-                "creation_time": 1764541163.7504299,
+                "steps": 8777229,
+                "file_path": "results\\understanding2\\RoboArm\\RoboArm-8777229.onnx",
+                "reward": 7.427459391800663,
+                "creation_time": 1764595426.2945197,
                 "auxillary_file_paths": [
-                    "results\\understanding2\\RoboArm\\RoboArm-5753370.pt"
+                    "results\\understanding2\\RoboArm\\RoboArm-8777229.pt"
                 ]
             }
         ],
         "final_checkpoint": {
-            "steps": 5753370,
+            "steps": 8777229,
             "file_path": "results\\understanding2\\RoboArm.onnx",
-            "reward": 7.388333270526476,
-            "creation_time": 1764541163.7504299,
+            "reward": 7.427459391800663,
+            "creation_time": 1764595426.2945197,
             "auxillary_file_paths": [
-                "results\\understanding2\\RoboArm\\RoboArm-5753370.pt"
+                "results\\understanding2\\RoboArm\\RoboArm-8777229.pt"
             ]
         }
     },
