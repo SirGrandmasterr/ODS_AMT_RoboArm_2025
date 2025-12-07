@@ -1,5 +1,5 @@
 /*
- * OPTIMIZED AGENT SCRIPT (v4.6 - Early Termination on Bad Drop)
+ * OPTIMIZED AGENT SCRIPT (v4.7 - Added Demo Configuration Helper)
  * ArmAgentSorting_Curriculum.cs
 */
 
@@ -86,6 +86,31 @@ public class ArmAgentSorting_Curriculum : Agent
         EndEpisode(); // Trigger OnEpisodeBegin to apply changes
     }
     
+    // --- NEW: Helper to configure bottle type from DemoManager ---
+    public void ForceConfigureBottle(GameObject bottleObj, BottleTargetSorting_Curriculum.MaterialType matType)
+    {
+        if (bottleObj == null) return;
+
+        var script = bottleObj.GetComponent<BottleTargetSorting_Curriculum>();
+        var rend = bottleObj.GetComponent<MeshRenderer>();
+
+        // 1. Set Logic Type
+        if (script != null) script.material = matType;
+
+        // 2. Set Visual Material
+        if (rend != null)
+        {
+            if (matType == BottleTargetSorting_Curriculum.MaterialType.Plastic && plasticMaterial != null)
+            {
+                rend.material = plasticMaterial;
+            }
+            else if (matType == BottleTargetSorting_Curriculum.MaterialType.Aluminum && aluminumMaterial != null)
+            {
+                rend.material = aluminumMaterial;
+            }
+        }
+    }
+
     public void SetDemoBottle(GameObject newBottle)
     {
         if (newBottle == null) return;
@@ -122,7 +147,7 @@ public class ArmAgentSorting_Curriculum : Agent
 
     public override void Initialize()
     {
-        bottleScript = bottle.GetComponent<BottleTargetSorting_Curriculum>();
+        if (bottle) bottleScript = bottle.GetComponent<BottleTargetSorting_Curriculum>();
         
         if (endEffector != null)
         {
@@ -157,7 +182,7 @@ public class ArmAgentSorting_Curriculum : Agent
         Release(); 
         ResetJointRotations(); 
         ApplyRotationsToTransforms(); 
-        bottleScript.ResetState();
+        if (bottleScript) bottleScript.ResetState();
 
         // --- Priority check for Manual Debug Mode ---
         if (manualDebugMode)

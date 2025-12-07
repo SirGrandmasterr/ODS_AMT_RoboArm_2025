@@ -11,15 +11,16 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Login.unity
     guid: e632e352c88281cfc918082df2408606
-  - enabled: 0
+  - enabled: 1
     path: Assets/Scenes/RobotArm.unity
     guid: 6ba5a41631c270cfca44dff7bc716c0e
   - enabled: 0
     path: Assets/Scenes/RobotArmRemote.unity
     guid: 07def8a78afa68c4792532cd8752434b
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/RobotArmTest.unity
     guid: 1891c0d2fb9d54c41af5269b2ac93ed6
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 35845fe01580c41289b024647b1d1c53, type: 3}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 8a15e70acf17fd9498778ebef151ac4f, type: 2}
   m_UseUCBPForAssetBundles: 0

@@ -327,7 +327,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Sp
   trainingEnvPrefab: {fileID: 2365943106887639635}
-  totalEnvironmentCount: 300
+  totalEnvironmentCount: 30
   gridSize: 6
   spacing: 10
 --- !u!4 &273327044

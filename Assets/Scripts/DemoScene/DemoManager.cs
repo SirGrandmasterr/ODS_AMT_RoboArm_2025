@@ -62,12 +62,24 @@ public class DemoManager : MonoBehaviour
 
     private void Update()
     {
-        // Reset Logic
-        if (waitingForReset && Input.GetKeyDown(KeyCode.R))
+        // Reset Logic - Check for Inputs
+        if (waitingForReset)
         {
-            Debug.Log("[DemoManager] User Input: Reset (R) detected.");
-            waitingForReset = false;
-            StartCoroutine(ResetSequence());
+            // R for Plastic (Default Reset)
+            if (Input.GetKeyDown(KeyCode.R))
+            {
+                Debug.Log("[DemoManager] User Input: Reset (R) detected - Spawning PLASTIC.");
+                waitingForReset = false;
+                StartCoroutine(ResetSequence(BottleTargetSorting_Curriculum.MaterialType.Plastic));
+            }
+            
+            // T for Aluminum (Test Mode)
+            if (Input.GetKeyDown(KeyCode.T))
+            {
+                Debug.Log("[DemoManager] User Input: Test (T) detected - Spawning ALUMINUM.");
+                waitingForReset = false;
+                StartCoroutine(ResetSequence(BottleTargetSorting_Curriculum.MaterialType.Aluminum));
+            }
         }
     }
 
@@ -143,20 +155,32 @@ public class DemoManager : MonoBehaviour
 
     private void HandleJobFinished()
     {
-        Debug.Log("<color=green>[DemoManager] Event Received: Sorting Job Finished.</color> Waiting for Reset (R).");
+        Debug.Log("<color=green>[DemoManager] Event Received: Sorting Job Finished.</color> Press 'R' for Plastic or 'T' for Aluminum.");
         waitingForReset = true;
         // Optional: Show UI "Press R to Reset"
     }
 
-    private IEnumerator ResetSequence()
+    private IEnumerator ResetSequence(BottleTargetSorting_Curriculum.MaterialType requestedType)
     {
-        Debug.Log("[DemoManager] Resetting Sequence...");
-        // Visual flair: Shrink bottle before respawning?
+        Debug.Log($"[DemoManager] Resetting Sequence... Type: {requestedType}");
+        
         currentBottle.SetActive(false);
+        
+        var bottleScript = currentBottle.GetComponent<BottleTargetSorting_Curriculum>();
+        if (bottleScript != null)
+        {
+            bottleScript.ResetState();
+        }
+       
+        if (robotAgent != null)
+        {
+            robotAgent.ForceConfigureBottle(currentBottle, requestedType);
+        }
+
         yield return new WaitForSeconds(0.2f);
         
         currentBottle.SetActive(true);
-        // Restart the main loop
+       
         StartCoroutine(SpawnAndTransportSequence());
     }
 }

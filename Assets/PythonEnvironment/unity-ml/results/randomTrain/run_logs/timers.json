@@ -1,0 +1,42 @@
+{
+    "name": "root",
+    "metadata": {
+        "timer_format_version": "0.1.0",
+        "start_time_seconds": "1764601217",
+        "python_version": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+        "command_line_arguments": "C:\\Users\\vogle\\AppData\\Local\\pypoetry\\Cache\\virtualenvs\\unity-ml-node-C5OsCjmo-py3.10\\Scripts\\mlagents-learn ..\\..\\training_config.yaml --run-id=randomTrain --force",
+        "mlagents_version": "1.1.0",
+        "mlagents_envs_version": "1.1.0",
+        "communication_protocol_version": "1.5.0",
+        "pytorch_version": "2.2.2+cu121",
+        "numpy_version": "1.23.5",
+        "end_time_seconds": "1764601280"
+    },
+    "total": 62.5596706000033,
+    "count": 1,
+    "self": 0.009316800002125092,
+    "children": {
+        "run_training.setup": {
+            "total": 0.07677100000000792,
+            "count": 1,
+            "self": 0.07677100000000792
+        },
+        "TrainerController.start_learning": {
+            "total": 62.47358280000117,
+            "count": 1,
+            "self": 0.00012540000170702115,
+            "children": {
+                "TrainerController._reset_env": {
+                    "total": 62.47343220000039,
+                    "count": 1,
+                    "self": 62.47343220000039
+                },
+                "TrainerController._save_models": {
+                    "total": 2.519999907235615e-05,
+                    "count": 1,
+                    "self": 2.519999907235615e-05
+                }
+            }
+        }
+    }
+}
