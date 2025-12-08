@@ -3,7 +3,9 @@ version: '3.8'
 services:
   backend:
     # Build the image from the Dockerfile in the current directory
-    build: .
+    build:
+      context: ../../../../
+      dockerfile: ODS_AMT_RoboArm_2025/Assets/PythonEnvironment/unity-ml/Dockerfile
     # Name the resulting image
     image: unity-ml-backend:latest
     
@@ -19,7 +21,7 @@ services:
                        
     # Change the command to match your application's entrypoint
     # This should match the CMD in your Dockerfile
-    command: ["python", "src/main.py"]
+    #command: ["python", "src/main.py"]
 
     # Expose ports if your application is a server
     # Example: Map host port 8000 to container port 8000
