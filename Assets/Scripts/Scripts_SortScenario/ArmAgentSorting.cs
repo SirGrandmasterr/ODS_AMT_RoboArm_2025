@@ -315,7 +315,7 @@ public class ArmAgentSorting_Curriculum : Agent
         sensor.AddObservation(Mathf.InverseLerp(drillRotationLimits.x, drillRotationLimits.y, currentSmallSegmentDrillYRotation));
         sensor.AddObservation(Mathf.InverseLerp(-90f, -28f, claw1XRotation)); 
 
-        // 1 Material
+        // 1 Material => Camera
         sensor.AddObservation((int)bottleScript.material);
 
         // 12 World State (Positions)
@@ -327,7 +327,7 @@ public class ArmAgentSorting_Curriculum : Agent
         // 3 Relative Vector
         sensor.AddObservation(bottle.position - endEffector.position); 
 
-        // 3 Bottle Orientation
+        // 3 Bottle Orientation => Camera
         sensor.AddObservation(bottle.up);
 
         // 1 Holding State
@@ -382,7 +382,7 @@ public class ArmAgentSorting_Curriculum : Agent
                     isBrainActive = false; // Shut off immediately
                     OnJobFinished?.Invoke();
                 }
-                // --- EARLY TERMINATION OPTIMIZATION ---
+               
                 // If we are in the placement phase (Lesson 2+) and we release the bottle
                 // while NOT in a bin zone, we fail immediately.
                 // This prevents wasting time watching the bottle fall to the conveyor.
@@ -484,7 +484,7 @@ public class ArmAgentSorting_Curriculum : Agent
             }
         }
         
-        // --- FALL CHECK ---
+        
         // (This runs as a backup if the Early Termination above didn't trigger
         // or for lessons < 2)
         bool isInBinZone2 = bottleScript.isOverAluminumBin || bottleScript.isOverPlasticBin;
