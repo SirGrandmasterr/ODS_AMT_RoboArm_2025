@@ -1,54 +1,71 @@
+using System;
+using Eike.Scripts;
 using UnityEngine;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 using Unity.VisualScripting;
+using Random = UnityEngine.Random;
 
-public class Robot : Agent
+public class HingeRobot : Agent
 {
-    [SerializeField] Transform Joint0;
-    [SerializeField] Transform Joint1;
-    [SerializeField] Transform Joint2;
-    [SerializeField] Transform Joint3;
-    [SerializeField] Transform EndEffector;
+    // [SerializeField] protected Transform Joint0;
+    // [SerializeField] protected Transform Joint1;
+    // [SerializeField] protected Transform Joint2;
+    // [SerializeField] protected Transform Joint3;
+    // [SerializeField] protected Transform EndEffector;
 
-    private float link1Length;
-    private float link2Length;
-    private float link3Length;
+    [SerializeField] protected JointController controller0;
+    [SerializeField] protected JointController controller1;
+    [SerializeField] protected JointController controller2;
+    [SerializeField] protected JointController controller3;
+    [SerializeField] protected Transform EndEffector;
 
-    [SerializeField] Transform Target;
+    protected float link1Length;
+    protected float link2Length;
+    protected float link3Length;
 
-    [SerializeField] Transform ControllerObject;
+    [SerializeField] protected Transform Target;
 
-    [SerializeField] Ground Ground;
+    [SerializeField] protected Transform ControllerObject;
 
-    private float minRange;
-    private float maxRange;
+    [SerializeField] protected Ground Ground;
 
-    [SerializeField] bool trainingMode = true;
+    protected float minRange;
+    protected float maxRange;
+    
 
-    private float rotateSpeed = 100f;
+    [SerializeField] protected bool trainingMode = true;
 
-    float beginDistance;
-    float prevBestDistance = float.MaxValue;
+    protected float rotateSpeed = 100f;
+
+    protected float beginDistance;
+    protected float prevBestDistance = float.MaxValue;
 
     void Start()
     {
-        link1Length = Vector3.Distance(Joint1.position, Joint2.position);
-        link2Length = Vector3.Distance(Joint2.position, Joint3.position);
-        link3Length = Vector3.Distance(Joint3.position, EndEffector.position);
+        Debug.Log("Start");
+        // link1Length = Vector3.Distance(Joint1.position, Joint2.position);
+        // link2Length = Vector3.Distance(Joint2.position, Joint3.position);
+        // link3Length = Vector3.Distance(Joint3.position, EndEffector.position);
+        
+        link1Length = Vector3.Distance(controller1.transform.position, controller2.transform.position);
+        link2Length = Vector3.Distance(controller2.transform.position, controller3.transform.position);
+        link3Length = Vector3.Distance(controller3.transform.position, EndEffector.position);
 
         maxRange = link1Length + link2Length - link3Length;
         minRange = 0.8f;
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-    }
+    // private void FixedUpdate()
+    // {
+    //     InverseKinematics3D(ControllerObject.localPosition);
+    // }
 
     public override void Initialize()
     {
+        Debug.Log("Initialize");
+        
         ResetAllAxis();
         MoveToSafeRandomPosition();
         if (!trainingMode) MaxStep = 0;
@@ -56,6 +73,8 @@ public class Robot : Agent
 
     public override void OnEpisodeBegin()
     {
+        Debug.Log("Begin");
+        
         if (!trainingMode)
             ResetAllAxis();
 
@@ -67,12 +86,22 @@ public class Robot : Agent
 
     public override void CollectObservations(VectorSensor sensor)
     {
+        // float[] joint_angles =
+        // {
+        //     Joint0.localRotation.eulerAngles.y / 180f,
+        //     Joint1.localRotation.eulerAngles.z / 90f,
+        //     Joint2.localRotation.eulerAngles.z / 180f,
+        //     Joint3.localRotation.eulerAngles.z / 180f
+        // };
+        
+        Debug.Log("CollectObservations");
+        
         float[] joint_angles =
         {
-            Joint0.localRotation.eulerAngles.y / 180f,
-            Joint1.localRotation.eulerAngles.z / 90f,
-            Joint2.localRotation.eulerAngles.z / 180f,
-            Joint3.localRotation.eulerAngles.z / 180f
+            controller0.GetAngle() / 180f,
+            controller1.GetAngle() / 90f,
+            controller2.GetAngle() / 180f,
+            controller3.GetAngle() / 180f
         };
 
         Vector3 localEndEffectorPos = transform.InverseTransformPoint(EndEffector.position);
@@ -88,25 +117,33 @@ public class Robot : Agent
 
     public override void OnActionReceived(ActionBuffers actions)
     {
+        Debug.Log("Received action");
+        
+        
         float[] angles = actions.ContinuousActions.Array;
 
-        // float angle0 = angles[0] * 180f;
-        // float angle1 = angles[1] * 90f;
-        // float angle2 = angles[2] * 180f;
-        // float angle3 = angles[3] * 180f;
-
         // // Rotate in the direction
-        float angle0 = Joint0.localRotation.eulerAngles.y + angles[0] * Time.deltaTime * rotateSpeed;
-        float angle1 = Joint1.localRotation.eulerAngles.z + angles[1] * Time.deltaTime * rotateSpeed;
-        float angle2 = Joint2.localRotation.eulerAngles.z + angles[2] * Time.deltaTime * rotateSpeed;
-        float angle3 = Joint3.localRotation.eulerAngles.z + angles[3] * Time.deltaTime * rotateSpeed;
+        float angle0 = controller0.GetAngle() + angles[0] * Time.deltaTime * rotateSpeed;
+        float angle1 = controller1.GetAngle() + angles[1] * Time.deltaTime * rotateSpeed;
+        float angle2 = controller2.GetAngle() + angles[2] * Time.deltaTime * rotateSpeed;
+        float angle3 = controller3.GetAngle() + angles[3] * Time.deltaTime * rotateSpeed;
 
 
-        Joint0.localRotation = Quaternion.Euler(0, angle0, 0);
-        Joint1.localRotation = Quaternion.Euler(0, 0, angle1);
-        Joint2.localRotation = Quaternion.Euler(0, 0, angle2);
-        Joint3.localRotation = Quaternion.Euler(0, 0, angle3);
+        controller0.SetAngle(angle0);
+        controller1.SetAngle(angle1);
+        controller2.SetAngle(angle2);
+        controller3.SetAngle(angle3);
+        
+        // controller0.transform.localRotation = Quaternion.Euler(0, angle0, 0);
+        // controller1.transform.localRotation = Quaternion.Euler(0, 0, angle1);
+        // controller2.transform.localRotation = Quaternion.Euler(0, 0, angle2);
+        // controller3.transform.localRotation = Quaternion.Euler(0, 0, angle3);
 
+        DistributeDenseReward();
+    }
+
+    protected void DistributeDenseReward()
+    {
         Vector3 localEndEffectorPos = transform.InverseTransformPoint(EndEffector.position);
 
         float distance_to_target = Vector3.Distance(localEndEffectorPos, Target.localPosition);
@@ -128,6 +165,7 @@ public class Robot : Agent
 
     public override void Heuristic(in ActionBuffers actionsOut)
     {
+        Debug.Log("In Heuristic");
         InverseKinematicsActionsOut(ControllerObject.localPosition, actionsOut);
     }
 
@@ -185,10 +223,10 @@ public class Robot : Agent
 
     private void ResetAllAxis()
     {
-        Joint0.localRotation = Quaternion.Euler(0, 0, 0);
-        Joint1.localRotation = Quaternion.Euler(0, 0, 0);
-        Joint2.localRotation = Quaternion.Euler(0, 0, 0);
-        Joint3.localRotation = Quaternion.Euler(0, 0, 0);
+        controller0.Reset();
+        controller1.Reset();
+        controller2.Reset();
+        controller3.Reset();
     }
 
     private void InverseKinematicsActionsOut(Vector3 localTargetPos, in ActionBuffers actionsOut)
@@ -202,8 +240,8 @@ public class Robot : Agent
         // Calculate joint positions in local Join0 space
 
         Quaternion invBaseRot = Quaternion.Inverse(Quaternion.Euler(0, theta0 * Mathf.Rad2Deg, 0));
-        Vector3 joint1Local = invBaseRot * transform.InverseTransformPoint(Joint1.position);
-        Vector3 joint3Local = invBaseRot * transform.InverseTransformPoint(Joint2.position);
+        Vector3 joint1Local = invBaseRot * transform.InverseTransformPoint(controller1.transform.position);
+        Vector3 joint3Local = invBaseRot * transform.InverseTransformPoint(controller2.transform.position);
         Vector3 targetLocal = invBaseRot * localTargetPos;
 
         float x = targetLocal.x - joint1Local.x;
@@ -242,10 +280,10 @@ public class Robot : Agent
 
         var continuousActions = actionsOut.ContinuousActions;
         
-        float error0 = Mathf.DeltaAngle(Joint0.localEulerAngles.y, theta0 * Mathf.Rad2Deg);
-        float error1 = Mathf.DeltaAngle(Joint1.localEulerAngles.z, theta1 * Mathf.Rad2Deg);
-        float error2 = Mathf.DeltaAngle(Joint2.localEulerAngles.z, theta2 * Mathf.Rad2Deg);
-        float error3 = Mathf.DeltaAngle(Joint3.localEulerAngles.z, theta3 * Mathf.Rad2Deg);
+        float error0 = Mathf.DeltaAngle(controller0.GetAngle(), theta0 * Mathf.Rad2Deg);
+        float error1 = Mathf.DeltaAngle(controller1.GetAngle(), theta1 * Mathf.Rad2Deg);
+        float error2 = Mathf.DeltaAngle(controller2.GetAngle(), theta2 * Mathf.Rad2Deg);
+        float error3 = Mathf.DeltaAngle(controller3.GetAngle(), theta3 * Mathf.Rad2Deg);
 
         float P_GAIN = 0.05f;
         
@@ -266,11 +304,8 @@ public class Robot : Agent
         // Calculate joint positions in local Join0 space
 
         Quaternion invBaseRot = Quaternion.Inverse(Quaternion.Euler(0, theta0 * Mathf.Rad2Deg, 0));
-        // Vector3 joint1Local = invBaseRot * (Joint1.position - transform.position);
-        // Vector3 joint3Local = invBaseRot * (Joint3.position - transform.position);
-        // Vector3 targetLocal = invBaseRot * (globalTargetPos - transform.position);
-        Vector3 joint1Local = invBaseRot * transform.InverseTransformPoint(Joint1.position);
-        Vector3 joint3Local = invBaseRot * transform.InverseTransformPoint(Joint2.position);
+        Vector3 joint1Local = invBaseRot * transform.InverseTransformPoint(controller1.transform.position);
+        Vector3 joint3Local = invBaseRot * transform.InverseTransformPoint(controller2.transform.position);
         Vector3 targetLocal = invBaseRot * localTargetPos;
 
         float x = targetLocal.x - joint1Local.x;
@@ -278,14 +313,6 @@ public class Robot : Agent
 
         float maxLength = link1Length + link2Length + link3Length - 1e-4f;
         Vector2 targetVector = new Vector2(x, y);
-
-        // if (targetVector.magnitude > maxLength)
-        // {
-
-        //     Vector2 clampedTargetVector = targetVector.normalized * maxLength;
-        //     x = clampedTargetVector.x;
-        //     y = clampedTargetVector.y;
-        // }
 
         float L1 = link1Length;
         float L2 = link2Length;
@@ -314,10 +341,15 @@ public class Robot : Agent
         // Theta 2
         float theta3 = phi_e - theta1 - theta2;
 
-        Joint0.localRotation = Quaternion.Euler(0, theta0 * Mathf.Rad2Deg, 0);
-        Joint1.localRotation = Quaternion.Euler(0, 0, theta1 * Mathf.Rad2Deg);
-        Joint2.localRotation = Quaternion.Euler(0, 0, theta2 * Mathf.Rad2Deg);
-        Joint3.localRotation = Quaternion.Euler(0, 0, theta3 * Mathf.Rad2Deg);
+        // Joint0.localRotation = Quaternion.Euler(0, theta0 * Mathf.Rad2Deg, 0);
+        // Joint1.localRotation = Quaternion.Euler(0, 0, theta1 * Mathf.Rad2Deg);
+        // Joint2.localRotation = Quaternion.Euler(0, 0, theta2 * Mathf.Rad2Deg);
+        // Joint3.localRotation = Quaternion.Euler(0, 0, theta3 * Mathf.Rad2Deg);
+        
+        controller0.SetAngle(theta0 * Mathf.Rad2Deg);
+        controller1.SetAngle(theta1 * Mathf.Rad2Deg);
+        controller2.SetAngle(theta2 * Mathf.Rad2Deg);
+        controller3.SetAngle(theta3 * Mathf.Rad2Deg);
     }
 
 

@@ -3,17 +3,17 @@ using UnityEngine;
 
 public class EndEffector : MonoBehaviour
 {
-    [SerializeField] private Robot Robot;
+    [SerializeField] private Robot robot;
 
     void OnTriggerEnter(Collider other)
     {
         if (other.tag.Equals("Target"))
         {
-            Robot.OnTargetReached();
+            robot.OnTargetReached();
         }
         else if (other.tag.Equals("Ground"))
         {
-            Robot.OnGroundHit();
+            robot.OnGroundHit();
         }
         else
         {
