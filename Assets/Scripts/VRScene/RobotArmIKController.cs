@@ -46,6 +46,13 @@ public class RobotArm_IK_Controller : MonoBehaviour
         StartCoroutine(PlaybackRoutine(relativePath));
     }
 
+    public void SetLiveTarget(Vector3 targetPos)
+    {
+        // Direct IK solve for one frame
+        SolveIK(targetPos);
+        UpdateFKValues();
+    }
+
     private IEnumerator PlaybackRoutine(List<Vector3> path)
     {
         isExecuting = true;

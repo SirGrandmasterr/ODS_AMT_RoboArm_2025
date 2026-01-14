@@ -1,6 +1,10 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.XR;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using System;
 
 namespace UnityFactorySceneHDRP
 {
@@ -8,41 +12,68 @@ namespace UnityFactorySceneHDRP
     {
         [Header("Imitation Components")]
         [SerializeField] private RobotArm_IK_Controller _robotArmController;
+        [SerializeField] private ArmAgentSorting_Curriculum _armAgent; // Reference to the Agent for Grab/Release
         [SerializeField] private GameObject _trackingBallPrefab;
         
-        [Header("VR Input Setup")]
+        [Header("VR Player Setup")]
         [Tooltip("The Transform of the Right Hand Controller (the one used for drawing).")]
         [SerializeField] private Transform _rightHandController;
         
         [Tooltip("The Transform of the VR Player Root (to move around).")]
         [SerializeField] private Transform _playerRoot;
+        
+        [Tooltip("The Locomotion System GameObject to deactivate (e.g. Move provider).")]
+        [SerializeField] private GameObject _locomotionSystem;
+        
+        [Tooltip("Optional: CharacterController to disable gravity/collision.")]
+        [SerializeField] private CharacterController _playerCharacterController;
+
+        [Tooltip("Target Transform to snap the player to when driving.")]
+        [SerializeField] private Transform _snapTarget;
 
         [Header("Button Bindings")]
-        [Tooltip("Binding for the Record Button (Right Hand Trigger).")]
-        [SerializeField] private string _recordBinding = "<XRController>{RightHand}/triggerPressed";
+        [Tooltip("Binding for the Record/Drive Mode Toggle. Default: Primary Button (A/X).")]
+        [SerializeField] private string _toggleDriveBinding = "<XRController>/primaryButton"; 
         
-        [Tooltip("Binding for Movement (Left Hand Thumbstick).")]
-        [SerializeField] private string _moveBinding = "<XRController>{LeftHand}/thumbstick";
+        [Tooltip("Binding for Grabbing. Default: Grip Axis (Analog).")]
+        [SerializeField] private string _grabBinding = "<XRController>/grip";
+
+        [Tooltip("Binding for Movement. Default: Thumbstick.")]
+        [SerializeField] private string _moveBinding = "<XRController>/thumbstick";
 
         [Header("Movement Settings")]
         [SerializeField] private float _moveSpeed = 2.0f;
+        
+        [Header("Drive Mode Settings")]
+        [Tooltip("Scale of the player in Drive Mode (e.g., 2.0 for 2x size).")]
+        [SerializeField] private float _driveScale = 1.0f;
 
         // Internal State
-        private bool _isRecording = false;
-        private GameObject _activeTrackingBall;
-        private List<Vector3> _recordedRelativePath = new List<Vector3>();
+        private bool _isDriveMode = false;
+        private bool _isGrabbing = false;
+        
+        // State Restoration
+        private Vector3 _originalPosition;
+        private Quaternion _originalRotation;
+        private Vector3 _originalScale;
+        
+        // Recording
+        private StringBuilder _csvRecording;
+        private float _recordingStartTime;
 
-        // Anchor for recording (to make it relative to start pose)
-        private GameObject _recordingAnchor;
+        // Visuals
+        private GameObject _activeTrackingBall;
         
         // Input Actions
-        private InputAction _recordAction;
+        private InputAction _toggleDriveAction;
+        private InputAction _grabAction;
         private InputAction _moveAction;
 
         private void Awake()
         {
             // Initialize Input Actions
-            _recordAction = new InputAction("Record", binding: _recordBinding);
+            _toggleDriveAction = new InputAction("ToggleDrive", binding: _toggleDriveBinding);
+            _grabAction = new InputAction("Grab", binding: _grabBinding);
             _moveAction = new InputAction("Move", binding: _moveBinding);
             _moveAction.AddCompositeBinding("2DVector")
                 .With("Up", "<XRController>{LeftHand}/thumbstick/y")
@@ -53,140 +84,261 @@ namespace UnityFactorySceneHDRP
 
         private void OnEnable()
         {
-            _recordAction.Enable();
+            _toggleDriveAction.Enable();
+            _grabAction.Enable();
             _moveAction.Enable();
         }
 
         private void OnDisable()
         {
-            _recordAction.Disable();
+            _toggleDriveAction.Disable();
+            _grabAction.Disable();
             _moveAction.Disable();
         }
 
         private void Update()
         {
-            if (_robotArmController == null)
+            if (_robotArmController == null) return;
+
+            // 1. Toggle Drive Mode
+            if (_toggleDriveAction.WasPressedThisFrame())
             {
-                Debug.LogWarning("[VR_Imitation] Robot Arm Controller is not assigned.");
+                if (_isDriveMode) StopDriveMode();
+                else StartDriveMode();
+            }
+
+            // 2. Drive Mode Logic
+            if (_isDriveMode)
+            {
+                HandleDriveLogic();
+                HandleGrabInput();
+            }
+            else
+            {
+                // 3. Normal Player Movement (Locomotion) - Only when NOT driving
+                HandleMovementLogic();
+            }
+        }
+
+        private void StartDriveMode()
+        {
+            if (_armAgent == null)
+            {
+                Debug.LogWarning("[VR_Imitation] ArmAgent not assigned. Cannot guide.");
                 return;
             }
 
-            // 1. Handle Recording Input
-            if (_recordAction.WasPressedThisFrame())
-            {
-                StartRecording();
-            }
-            else if (_recordAction.WasReleasedThisFrame())
-            {
-                StopRecording();
-            }
+            _isDriveMode = true;
+            Debug.Log("[VR_Imitation] Starting Drive Mode...");
 
-            // 2. Logic
-            if (_isRecording)
-            {
-                HandleRecordingLogic();
-            }
-            
-            // 3. Player Movement (Locomotion)
-            HandleMovementLogic();
-        }
-
-        private void StartRecording()
-        {
-            _isRecording = true;
-            _recordedRelativePath.Clear();
-
-            // --- ANCHOR SETUP ---
-            // Create a stationary anchor at the current position relative to base or player.
-            // In CameraMoveImitation, it was _playerRoot.pos/rot.
-            // Here we can use the Robot Base, or just the current Hand Position as the "Zero".
-            // However, CameraMoveImitation used _playerRoot to be "Independent of the Robot".
-            // Let's stick to the current Right Hand position as the start? 
-            // NO, CameraMoveImitation used _playerRoot.position.
-            // The goal is to record a RELATIVE path.
-            // Let's create an anchor at the Robot Arm Base or the Player Root?
-            // If the user moves around while recording, the anchor must be stationary in world or relative to something?
-            // CameraMoveImitation made the _rigidbody Kinematic (stationary) during recording.
-            // In VR, the player might move their head, but we probably want the *Environment* reference frame.
-            
-            _recordingAnchor = new GameObject("VR_Recording_Anchor_Temp");
-            
-            // We use the Robot Arm Base as the reference frame if possible, or just world zero if it's stationary.
-            // But CameraMoveImitation aligned the anchor with the PLAYER.
-            // This suggests the recording is "Relative to where I am standing".
-            // Since we want to support OpenXR/RoomScale, let's align the anchor with the Robot Arm Base 
-            // but rotated to match the player? Or just Robot Arm Base directly?
-            // "RobotArmController.ProcessRecordedPath" converts relative path -> World Target using "transform.TransformPoint".
-            // The RobotArmController script assumes the path is in its local space?
-            // RobotArmIKController:
-            // "Vector3 recordedStartPos = transform.TransformPoint(path[0]);"
-            // "Vector3 actualStartPos = endEffector.position;" 
-            // "pathOffset = actualStartPos - recordedStartPos;"
-            // It seems it calculates an offset.
-            
-            // Best approach: Use the RobotArm base as the parent of our anchor creates a path relative to the robot.
-            // CameraMoveImitation used _playerRoot. 
-            // Let's try to mimic CameraMoveImitation logic: The anchor is spawned at _playerRoot.
-            // If we use _playerRoot in VR (the XR Rig Origin), it should work similarly.
-            
+            // --- SAVE STATE ---
             if (_playerRoot != null)
             {
-                _recordingAnchor.transform.position = _playerRoot.position;
-                _recordingAnchor.transform.rotation = _playerRoot.rotation;
-            }
-            else
-            {
-                _recordingAnchor.transform.position = transform.position;
-                _recordingAnchor.transform.rotation = transform.rotation;
+                _originalPosition = _playerRoot.position;
+                _originalRotation = _playerRoot.rotation;
+                _originalScale = _playerRoot.localScale;
             }
 
-            // --- UPSIDE DOWN ADAPTATION (From CameraMoveImitation) ---
-            if (_robotArmController != null && _robotArmController.isUpsideDown)
+            // --- DEBUG: Analyzed Devices ---
+            Debug.Log("[VR_Imitation] Analyzing Input Devices...");
+            foreach (var dev in InputSystem.devices)
             {
-                _recordingAnchor.transform.Rotate(0, 0, 180f, Space.Self);
+                string usages = string.Join(",", dev.usages);
+                Debug.Log($"[Device] '{dev.name}' (Class: {dev.GetType().Name})\n   Path: {dev.path}\n   Usages: [{usages}]");
+
+                // Dump controls for Index/Controller to see what they are called
+                if (dev.name.Contains("Index") || dev.name.Contains("Controller"))
+                {
+                    Debug.Log($"   -> Dumping Controls for {dev.name}:");
+                    foreach(var c in dev.allControls)
+                    {
+                        // Log first few or specific interesting ones
+                        if(c.name.Contains("trigger") || c.name.Contains("grip") || c.name.Contains("primary"))
+                            Debug.Log($"      - {c.name} (Path: {c.path}) Type: {c.GetType().Name}");
+                    }
+                }
+            }
+            // ---------------------------
+
+            // --- LOCK & SNAP ---
+            if (_locomotionSystem != null) _locomotionSystem.SetActive(false);
+            if (_playerCharacterController != null) _playerCharacterController.enabled = false;
+            
+            // Try to disable XRBodyTransformer to stop spam
+            var bodyTransformer = _playerRoot.GetComponentInChildren<UnityEngine.XR.Interaction.Toolkit.Locomotion.XRBodyTransformer>();
+            if (bodyTransformer != null) bodyTransformer.enabled = false;
+
+            if (_snapTarget != null && _playerRoot != null)
+            {
+                // Snap Position & Rotation
+                _playerRoot.position = _snapTarget.position;
+                _playerRoot.rotation = _snapTarget.rotation;
+                
+                // Apply Scale
+                _playerRoot.localScale = Vector3.one * _driveScale;
             }
 
-            // Spawn visual ball
+            // Take control of Agent
+            _armAgent.SetExternalControl(true);
+
+            // Init Recording
+            _csvRecording = new StringBuilder();
+            _csvRecording.AppendLine("Time,Base,First,Small,Drill,Claw"); // Header
+            _recordingStartTime = Time.time;
+
+            // Visual Cue?
             if (_trackingBallPrefab != null)
             {
-                _activeTrackingBall = Instantiate(_trackingBallPrefab);
-                if(_activeTrackingBall.GetComponent<Collider>()) 
-                    Destroy(_activeTrackingBall.GetComponent<Collider>());
-            }
-            else
-            {
-                _activeTrackingBall = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                _activeTrackingBall.transform.localScale = Vector3.one * 0.1f;
-                Destroy(_activeTrackingBall.GetComponent<Collider>());
+                 _activeTrackingBall = Instantiate(_trackingBallPrefab);
+                 if(_activeTrackingBall.GetComponent<Collider>()) Destroy(_activeTrackingBall.GetComponent<Collider>());
             }
         }
 
-        private void HandleRecordingLogic()
-        {
-            if (_activeTrackingBall == null || _recordingAnchor == null || _rightHandController == null) return;
+        // ... StopDriveMode ...
 
-            // Target is the Hand Position
-            Vector3 targetPos = _rightHandController.position;
+        private void LogAllControllerInputs()
+        {
+            if (Time.frameCount % 30 != 0) return; 
+
+            var devices = InputSystem.devices;
+            foreach (var device in devices)
+            {
+                // Filter for likely controllers to avoid spamming from Keyboard/Mouse
+                if (!device.name.ToLower().Contains("controller") && !device.name.ToLower().Contains("hand")) continue;
+
+                foreach (var control in device.allControls)
+                {
+                    // Check for floats (Triggers, Grips)
+                    if (control is InputControl<float> floatControl && floatControl.ReadValue() > 0.05f)
+                    {
+                        Debug.Log($"[InputDebug] Device: {device.name} | Control: {control.name} | Value: {floatControl.ReadValue():F2}");
+                    }
+                    // Check for bools (Buttons)
+                    else if (control is InputControl<bool> boolControl && boolControl.ReadValue())
+                    {
+                         // Filter out "AnyKey" or excessively noisy synthetics if needed, but for now show all
+                        Debug.Log($"[InputDebug] Device: {device.name} | Control: {control.name} | State: Pressed");
+                    }
+                }
+            }
+        }
+
+        private void StopDriveMode()
+        {
+            _isDriveMode = false;
+            Debug.Log("[VR_Imitation] Stopping Drive Mode...");
+
+            // Release Agent
+            if(_armAgent) _armAgent.SetExternalControl(false);
+
+            // Re-enable Movement
+            if (_locomotionSystem != null) _locomotionSystem.SetActive(true);
+            if (_playerCharacterController != null) _playerCharacterController.enabled = true;
             
-            // Update Ball
-            _activeTrackingBall.transform.position = targetPos;
+            var bodyTransformer = _playerRoot.GetComponentInChildren<UnityEngine.XR.Interaction.Toolkit.Locomotion.XRBodyTransformer>();
+            if (bodyTransformer != null) bodyTransformer.enabled = true;
+            
+            // --- RESTORE STATE ---
+            if (_playerRoot != null)
+            {
+                _playerRoot.position = _originalPosition;
+                _playerRoot.rotation = _originalRotation;
+                _playerRoot.localScale = _originalScale;
+            }
 
-            // Record Relative
-            Vector3 relativePoint = _recordingAnchor.transform.InverseTransformPoint(targetPos);
-            _recordedRelativePath.Add(relativePoint);
+            // Destroy Visuals
+            if (_activeTrackingBall != null) Destroy(_activeTrackingBall);
+
+            // Save Recording
+            SaveRecordingToFile();
         }
 
-        private void StopRecording()
+        private void HandleDriveLogic()
         {
-            _isRecording = false;
+            if (_rightHandController == null) return;
 
-            if (_activeTrackingBall != null) Destroy(_activeTrackingBall);
-            if (_recordingAnchor != null) Destroy(_recordingAnchor);
+            Vector3 targetPos = _rightHandController.position;
 
-            if (_robotArmController != null && _recordedRelativePath.Count > 0)
+            // Update IK
+            _robotArmController.SetLiveTarget(targetPos);
+
+            // Visuals
+            if (_activeTrackingBall) _activeTrackingBall.transform.position = targetPos;
+
+            // Record Frame
+            if (_csvRecording != null)
             {
-                _robotArmController.ProcessRecordedPath(_recordedRelativePath);
+                float time = Time.time - _recordingStartTime;
+                // Get Angles from IK Controller (which reads from Transforms)
+                float baseA = _robotArmController.out_BaseY;
+                float firstA = _robotArmController.out_FirstY;
+                float smallA = _robotArmController.out_SmallY;
+                float drillA = _robotArmController.out_DrillY;
+                // Claw state: we can use a float representation. 0 = Open, 1 = Closed.
+                float clawVal = _isGrabbing ? 1.0f : 0.0f;
+
+                _csvRecording.AppendLine($"{time:F4},{baseA:F4},{firstA:F4},{smallA:F4},{drillA:F4},{clawVal:F1}");
             }
+        }
+
+        [Header("Debug Settings")]
+        [SerializeField] private bool _showInputDebug = true; // Enabled by default for debugging
+
+        private void HandleGrabInput()
+        {
+            Debug.Log("Test");
+            if (_armAgent == null) 
+            {
+                if (Time.frameCount % 60 == 0) Debug.LogWarning("[VR_Imitation] HandleGrabInput: ArmAgent is NULL!");
+                return;
+            }
+
+            float grabValue = _grabAction.ReadValue<float>();
+            
+            // Log only significant changes or non-zero to avoid spam, but initially logging everything helps.
+            if (_showInputDebug && grabValue > 0.01f)
+            {
+                // Debug.Log($"[VR_Imitation] Grab Action Raw Value from Binding '{_grabBinding}': {grabValue}");
+            }
+
+            bool isPressing = grabValue > 0.5f;
+
+            if (isPressing && !_isGrabbing)
+            {
+                Debug.Log($"[VR_Imitation] Grabbing! (Value: {grabValue})");
+                _isGrabbing = true;
+                _armAgent.Grab();
+                _armAgent.SetClawState(true);
+            }
+            else if (!isPressing && _isGrabbing)
+            {
+                Debug.Log($"[VR_Imitation] Releasing! (Value: {grabValue})");
+                _isGrabbing = false;
+                _armAgent.Release();
+                _armAgent.SetClawState(false);
+            }
+
+            if (_showInputDebug)
+            {
+                LogAllControllerInputs();
+            }
+        }
+
+
+
+        private void SaveRecordingToFile()
+        {
+            if (_csvRecording == null || _csvRecording.Length == 0) return;
+
+            string filename = $"RobotArm_Recording_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+            string path = Path.Combine(Application.persistentDataPath, "Recordings");
+            
+            if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+            
+            string fullPath = Path.Combine(path, filename);
+            
+            File.WriteAllText(fullPath, _csvRecording.ToString());
+            Debug.Log($"[VR_Imitation] Recording saved to: {fullPath}");
         }
 
         private void HandleMovementLogic()
@@ -196,15 +348,9 @@ namespace UnityFactorySceneHDRP
             Vector2 moveInput = _moveAction.ReadValue<Vector2>();
             if (moveInput.sqrMagnitude < 0.01f) return;
 
-            // Move relative to Headset look direction? Or just Controller direction? 
-            // Usually Headset. But we don't have Headset ref here.
-            // We'll move relative to PlayerRoot forward for now, or just World X/Z.
-            // Let's assume standard "Twin Stick" movement relative to the Rig orientation.
-            
             Vector3 moveDir = new Vector3(moveInput.x, 0, moveInput.y);
-            // Transform by player root rotation
             moveDir = _playerRoot.TransformDirection(moveDir);
-            moveDir.y = 0; // Keep on floor
+            moveDir.y = 0; 
             
             _playerRoot.position += moveDir * _moveSpeed * Time.deltaTime;
         }

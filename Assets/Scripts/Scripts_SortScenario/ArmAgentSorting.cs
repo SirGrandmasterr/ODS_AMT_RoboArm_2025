@@ -339,6 +339,7 @@ public class ArmAgentSorting_Curriculum : Agent
 
     public override void OnActionReceived(ActionBuffers actions)
     {
+        if (_isExternallyControlled) return;
         if (isDemoMode && !isBrainActive) return;
         float rotationSpeed = 100f; 
         
@@ -521,6 +522,11 @@ public class ArmAgentSorting_Curriculum : Agent
         if (smallSegment) smallSegment.localRotation = Quaternion.Euler(-180f, currentSmallSegmentYRotation, 0f);
         if (smallSegmentDrill) smallSegmentDrill.localRotation = Quaternion.Euler(0f, currentSmallSegmentDrillYRotation, 0f);
         
+        ApplyClawRotations();
+    }
+
+    private void ApplyClawRotations()
+    {
         float lerpSpeed = 15f;
         if (claw1) claw1.localRotation = Quaternion.Lerp(claw1.localRotation, Quaternion.Euler(claw1XRotation, 0f, 0f), Time.fixedDeltaTime * lerpSpeed);
         if (claw2) claw2.localRotation = Quaternion.Lerp(claw2.localRotation, Quaternion.Euler(claw2XRotation, 0f, 0f), Time.fixedDeltaTime * lerpSpeed);
@@ -528,7 +534,16 @@ public class ArmAgentSorting_Curriculum : Agent
 
     void FixedUpdate()
     {
-        ApplyRotationsToTransforms();
+        // Always animate claws
+        ApplyClawRotations();
+
+        if (!_isExternallyControlled)
+        {
+             if (armbase) armbase.localRotation = Quaternion.Euler(0f, currentBaseYRotation, 0f);
+             if (firstSegment) firstSegment.localRotation = Quaternion.Euler(0f, currentFirstSegmentYRotation, 0f);
+             if (smallSegment) smallSegment.localRotation = Quaternion.Euler(-180f, currentSmallSegmentYRotation, 0f);
+             if (smallSegmentDrill) smallSegmentDrill.localRotation = Quaternion.Euler(0f, currentSmallSegmentDrillYRotation, 0f);
+        }
     }
     
     public override void Heuristic(in ActionBuffers actionsOut)
@@ -612,5 +627,57 @@ public class ArmAgentSorting_Curriculum : Agent
             if(!manualDebugMode) EndEpisode();
             else Debug.Log("[Debug] Bottle Dropped on Ground.");
         }
+    }
+
+    // --- EXTERNAL CLAW CONTROL ---
+    public void SetClawState(bool closed)
+    {
+        if (closed)
+        {
+            claw1XRotation = -28.0f;
+            claw2XRotation = 28.0f;
+        }
+        else
+        {
+            claw1XRotation = -90.0f;
+            claw2XRotation = 90.0f;
+        }
+    }
+
+    // --- EXTERNAL CONTROL (For VR / IK Driving) ---
+    private bool _isExternallyControlled = false;
+
+    public void SetExternalControl(bool isActive)
+    {
+        _isExternallyControlled = isActive;
+        if (isActive)
+        {
+            // Optional: You might want to stop the RB from sleeping or ensure it stays kinematic
+        }
+        else
+        {
+            // When returning control to Agent, we should sync internal state to current transform to avoid snapping
+            SyncInternalStateFromTransforms();
+        }
+    }
+
+    private void SyncInternalStateFromTransforms()
+    {
+        // Reverse of ApplyRotations. 
+        // Note: This assumes simple 1-axis rotations as per existing logic.
+        if(armbase) currentBaseYRotation = NormalizeAngle(armbase.localEulerAngles.y);
+        if(firstSegment) currentFirstSegmentYRotation = NormalizeAngle(firstSegment.localEulerAngles.y);
+        if(smallSegment) currentSmallSegmentYRotation = NormalizeAngle(smallSegment.localEulerAngles.y); // Note the -180 offset in Apply
+        if(smallSegmentDrill) currentSmallSegmentDrillYRotation = NormalizeAngle(smallSegmentDrill.localEulerAngles.y);
+        
+        // Claws likely need similar logic if we want to sync them
+        // For now, we leave claws as is or reset them.
+    }
+
+    private float NormalizeAngle(float angle)
+    {
+        while (angle > 180f) angle -= 360f;
+        while (angle < -180f) angle += 360f;
+        return angle;
     }
 }
