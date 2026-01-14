@@ -54,6 +54,17 @@ public class ArmAgentSorting_Curriculum : Agent
     public bool isDemoMode = false; // Check this in the Inspector for the Demo Scene
     public bool isBrainActive = false; // The DemoManager will toggle this
     public event Action OnJobFinished;
+    public event Action OnEpisodeEnded; // New Event for reliable tracking
+
+    [Header("IK Integration")]
+    [SerializeField] private RobotArm_IK_Controller ikController; 
+    public bool useIKHeuristic = false;
+    
+    // --- DEPENDENCY INJECTION ---
+    public void SetIKController(RobotArm_IK_Controller controller)
+    {
+        ikController = controller;
+    }
     
     // --- Private State ---
     private BottleTargetSorting_Curriculum bottleScript;
@@ -176,6 +187,7 @@ public class ArmAgentSorting_Curriculum : Agent
             lesson_number = 3.0f; 
             return;
         }
+
         // Check standard curriculum unless Manual Mode is on
         lesson_number = Academy.Instance.EnvironmentParameters.GetWithDefault("lesson_number", 0f);
 
@@ -183,6 +195,18 @@ public class ArmAgentSorting_Curriculum : Agent
         ResetJointRotations(); 
         ApplyRotationsToTransforms(); 
         if (bottleScript) bottleScript.ResetState();
+        
+        // Notify listeners that a new episode has begun (or rather, the previous ended and we are resetting)
+        // Actually, OnEpisodeBegin is called AFTER EndEpisode. 
+        // We want to know when EndEpisode was CALLED. 
+        // But we can't easily hook into EndEpisode directly without overriding it or adding calls everywhere.
+        // EASIER: Just invoke OnEpisodeEnded inside OnEpisodeBegin? 
+        // No, OnEpisodeBegin is the start of the NEW one.
+        // Let's add the invocation to where EndEpisode is called manually or override logic? 
+        // No, Agent.EndEpisode is final.
+        // Better: We invoke the event at the START of OnEpisodeBegin.
+        // This signifies the Agent has reset.
+        OnEpisodeEnded?.Invoke();
 
         // --- Priority check for Manual Debug Mode ---
         if (manualDebugMode)
@@ -339,16 +363,26 @@ public class ArmAgentSorting_Curriculum : Agent
 
     public override void OnActionReceived(ActionBuffers actions)
     {
-        if (_isExternallyControlled) return;
-        if (isDemoMode && !isBrainActive) return;
-        float rotationSpeed = 100f; 
+        // if (_isExternallyControlled) return; // REMOVED to allow Logic/Rewards to run
         
-        currentBaseYRotation += actions.ContinuousActions[0] * Time.fixedDeltaTime * rotationSpeed;
-        currentFirstSegmentYRotation += actions.ContinuousActions[1] * Time.fixedDeltaTime * rotationSpeed;
-        currentSmallSegmentYRotation += actions.ContinuousActions[2] * Time.fixedDeltaTime * rotationSpeed;
-        currentSmallSegmentDrillYRotation += actions.ContinuousActions[3] * Time.fixedDeltaTime * rotationSpeed;
+        if (isDemoMode && !isBrainActive) return;
+        
+        // --- MOVEMENT UPDATES (Skip if controlled by IK) ---
+        if (!_isExternallyControlled)
+        {
+            float rotationSpeed = 100f; 
+            
+            currentBaseYRotation += actions.ContinuousActions[0] * Time.fixedDeltaTime * rotationSpeed;
+            currentFirstSegmentYRotation += actions.ContinuousActions[1] * Time.fixedDeltaTime * rotationSpeed;
+            currentSmallSegmentYRotation += actions.ContinuousActions[2] * Time.fixedDeltaTime * rotationSpeed;
+            currentSmallSegmentDrillYRotation += actions.ContinuousActions[3] * Time.fixedDeltaTime * rotationSpeed;
+        }
         
         float clawInput = actions.ContinuousActions[4];
+        
+        // DEBUG TRACE
+        if (manualDebugMode) Debug.Log($"[Agent] OnActionReceived - ClawInput: {clawInput}");
+
         bool wasHolding = IsHoldingObject();
 
         if (clawInput > 0.5f) // Close
@@ -364,7 +398,9 @@ public class ArmAgentSorting_Curriculum : Agent
                     if (Grab()) 
                     {
                         AddReward(1.0f); 
-                        if (!manualDebugMode && lesson_number == 1f) EndEpisode(); 
+                        // Only end episode if NOT in Demo Mode (User Drive Mode)
+                        // In User Drive Mode, we want to continue until the bottle is placed
+                        if (!manualDebugMode && !isDemoMode && lesson_number == 1f) EndEpisode(); 
                     }
                 }
             }
@@ -550,12 +586,60 @@ public class ArmAgentSorting_Curriculum : Agent
     {
         var continuousActions = actionsOut.ContinuousActions;
         continuousActions.Clear();
-        continuousActions[0] = Input.GetKey(KeyCode.D) ? 1f : (Input.GetKey(KeyCode.A) ? -1f : 0f);
-        continuousActions[1] = Input.GetKey(KeyCode.W) ? -1f : (Input.GetKey(KeyCode.S) ? 1f : 0f);
-        continuousActions[2] = Input.GetKey(KeyCode.UpArrow) ? -1f : (Input.GetKey(KeyCode.DownArrow) ? 1f : 0f);
-        continuousActions[3] = Input.GetKey(KeyCode.RightArrow) ? 1f : (Input.GetKey(KeyCode.LeftArrow) ? -1f : 0f);
-        continuousActions[4] = Input.GetKey(KeyCode.Space) ? 1.0f : -1.0f;
+
+        if (useIKHeuristic && ikController != null)
+        {
+            // --- IK HEURISTIC MODE ---
+            // Calculate the action required to reach the target angle from the current angle given the speed = 100f
+            float speed = 100f; 
+            float dt = Time.fixedDeltaTime;
+
+            // Base
+            float targetBase = ikController.out_BaseY; 
+            float diffBase = targetBase - currentBaseYRotation;
+            continuousActions[0] = Mathf.Clamp(diffBase / (speed * dt), -1f, 1f);
+
+            // First
+            float targetFirst = ikController.out_FirstY;
+            float diffFirst = targetFirst - currentFirstSegmentYRotation;
+            continuousActions[1] = Mathf.Clamp(diffFirst / (speed * dt), -1f, 1f);
+
+            // Small
+            float targetSmall = ikController.out_SmallY;
+            float diffSmall = targetSmall - currentSmallSegmentYRotation;
+            continuousActions[2] = Mathf.Clamp(diffSmall / (speed * dt), -1f, 1f);
+
+            // Drill
+            float targetDrill = ikController.out_DrillY;
+            float diffDrill = targetDrill - currentSmallSegmentDrillYRotation;
+            // The Agent logic treats left/right arrow as +/- 1 which rotates the drill.
+            // We need to map the delta directly.
+            continuousActions[3] = Mathf.Clamp(diffDrill / (speed * dt), -1f, 1f);
+
+            // Claw
+            // If IK Controller has a claw state, we could use it. 
+            // For now, we assume the VR Controller sets a separate boolean we can read or the IK controller handles it.
+            // Let's assume we read from the same source the IK Controller gets its info from? 
+            // Actually, cleanest way is for the VR Script to set a bool on THIS Agent for "ClawClosedDesired"
+            // But since we are inside the Agent, we can just check the claw state logic directly or add a public property.
+            // For simplicity, let's assume the VR Controller updates a public bool 'externalClawSignal' on this script.
+             continuousActions[4] = externalClawSignal ? 1.0f : -1.0f;
+             
+             // DEBUG TRACE
+             if (manualDebugMode) Debug.Log($"[Agent] Heuristic - External Signal: {externalClawSignal} -> Action: {continuousActions[4]}");
+        }
+        else
+        {
+            // --- KEYBOARD DEFAULT ---
+            continuousActions[0] = Input.GetKey(KeyCode.D) ? 1f : (Input.GetKey(KeyCode.A) ? -1f : 0f);
+            continuousActions[1] = Input.GetKey(KeyCode.W) ? -1f : (Input.GetKey(KeyCode.S) ? 1f : 0f);
+            continuousActions[2] = Input.GetKey(KeyCode.UpArrow) ? -1f : (Input.GetKey(KeyCode.DownArrow) ? 1f : 0f);
+            continuousActions[3] = Input.GetKey(KeyCode.RightArrow) ? 1f : (Input.GetKey(KeyCode.LeftArrow) ? -1f : 0f);
+            continuousActions[4] = Input.GetKey(KeyCode.Space) ? 1.0f : -1.0f;
+        }
     }
+
+    public bool externalClawSignal = false; // Set by VR Controller in Heuristic Mode
 
     public bool Grab()
     {

@@ -6,6 +6,9 @@ using System.IO;
 using System.Text;
 using System;
 
+using Unity.MLAgents.Demonstrations;
+using Unity.MLAgents.Policies;
+
 namespace UnityFactorySceneHDRP
 {
     public class VR_Imitation_Controller : MonoBehaviour
@@ -64,12 +67,20 @@ namespace UnityFactorySceneHDRP
         private Vector3 _originalScale;
         
         // Recording
-        private StringBuilder _csvRecording;
-        private float _recordingStartTime;
+        private DemonstrationRecorder _demoRecorder;
+        private Coroutine _sessionCoroutine;
+        
+        [Header("Demonstration Settings")]
+        [SerializeField] private string _demoNameBase = "Sorting_Demo_User";
+        [SerializeField] private int _episodesToRecord = 10;
 
         // Visuals
         private GameObject _activeTrackingBall;
         
+        // State Backup
+        private bool _wasDemoMode = false;
+        private bool _wasManualMode = false;
+
         // Input Actions
         private InputAction _toggleDriveAction;
         private InputAction _grabAction;
@@ -195,11 +206,38 @@ namespace UnityFactorySceneHDRP
 
             // Take control of Agent
             _armAgent.SetExternalControl(true);
+            _armAgent.useIKHeuristic = true; // Enable IK Heuristic on Agent
+             _armAgent.SetIKController(_robotArmController); // Inject Reference
+            
+            // Force Agent to Heuristic Mode
+            var behaviorParams = _armAgent.GetComponent<BehaviorParameters>();
+            if (behaviorParams != null)
+            {
+                behaviorParams.BehaviorType = BehaviorType.HeuristicOnly;
+            }
 
-            // Init Recording
-            _csvRecording = new StringBuilder();
-            _csvRecording.AppendLine("Time,Base,First,Small,Drill,Claw"); // Header
-            _recordingStartTime = Time.time;
+            // --- CRITICAL FIX: ENABLE MANUAL SCENARIO ---
+            // Save state
+            _wasDemoMode = _armAgent.isDemoMode;
+            // Accessing private field? No, set/get via property if available, but for now we rely on the public field.
+            // But we need to check if we can read manual mode. 
+            // ArmAgentSorting doesn't expose a getter for manualDebugMode easily, preventing "restore" if we don't know it.
+            // Assumption: Manual mode is usually false in builds. We'll set it false on exit.
+            
+            _armAgent.isDemoMode = false; // Disable "Passive Demo" logic so OnEpisodeBegin runs fully
+            _armAgent.SetManualDebugMode(true); // Force "Full Task" Scenario
+
+            // Get or Add Recorder
+            _demoRecorder = _armAgent.GetComponent<DemonstrationRecorder>();
+            if (_demoRecorder == null)
+            {
+                _demoRecorder = _armAgent.gameObject.AddComponent<DemonstrationRecorder>();
+                _demoRecorder.NumStepsToRecord = 0; // Infinite
+            }
+            
+            // Start Session
+            if (_sessionCoroutine != null) StopCoroutine(_sessionCoroutine);
+            _sessionCoroutine = StartCoroutine(DemonstrationSession());
 
             // Visual Cue?
             if (_trackingBallPrefab != null)
@@ -207,6 +245,60 @@ namespace UnityFactorySceneHDRP
                  _activeTrackingBall = Instantiate(_trackingBallPrefab);
                  if(_activeTrackingBall.GetComponent<Collider>()) Destroy(_activeTrackingBall.GetComponent<Collider>());
             }
+        }
+        
+        private System.Collections.IEnumerator DemonstrationSession()
+        {
+            Debug.Log($"[VR_Imitation] Starting Demonstration Session of {_episodesToRecord} episodes.");
+            
+            int episodesCompleted = 0;
+            
+            // Ensure Agent doesn't auto-reset for this session logic if possible, 
+            // but Agent.EndEpisode() is how we normally reset.
+            // We need to coordinate with the Agent's "OnJobFinished" or similar.
+            
+            while (episodesCompleted < _episodesToRecord && _isDriveMode)
+            {
+                Debug.Log($"[VR_Imitation] Starting Episode {episodesCompleted + 1}/{_episodesToRecord}");
+                
+                // Configure Recorder
+                _demoRecorder.DemonstrationName = $"{_demoNameBase}_{DateTime.Now:MMdd_HHmm}_Ep{episodesCompleted}";
+                _demoRecorder.Record = true;
+
+                // Reset Agent to start new episode (spawns bottle is handled in OnEpisodeBegin)
+                // We call EndEpisode() to force a reset if one hasn't happened yet? 
+                // Or just rely on the flow?
+                // The loop below waits for the NEXT EndEpisode trigger.
+                // If we want to start fresh now, we should force one.
+                if (episodesCompleted == 0)
+                {
+                    _armAgent.EndEpisode(); 
+                }
+                
+                // Wait for completion (Agent adds reward and ends episode on success/fail)
+                bool episodeFinished = false;
+                Action onFinish = () => { episodeFinished = true; };
+                _armAgent.OnEpisodeEnded += onFinish;
+                
+                while (!episodeFinished && _isDriveMode)
+                {
+                    yield return null;
+                }
+                
+                _armAgent.OnEpisodeEnded -= onFinish;
+                
+                if (!_isDriveMode) break;
+
+                // Episode Finished
+                _demoRecorder.Record = false;
+                episodesCompleted++;
+                Debug.Log($"[VR_Imitation] Episode {episodesCompleted} Finished.");
+                
+                yield return new WaitForSeconds(0.5f); // Short break between bottles
+            }
+            
+            Debug.Log("[VR_Imitation] Session Complete. Stopping Drive Mode.");
+            StopDriveMode();
         }
 
         // ... StopDriveMode ...
@@ -253,7 +345,26 @@ namespace UnityFactorySceneHDRP
             }
 
             // Release Agent
-            if(_armAgent) _armAgent.SetExternalControl(false);
+            if(_armAgent) 
+            {
+                _armAgent.SetExternalControl(false);
+                _armAgent.useIKHeuristic = false;
+                
+                // Restore Modes
+                _armAgent.SetManualDebugMode(false);
+                _armAgent.isDemoMode = _wasDemoMode;
+
+                // Reset Behavior Type to Inference (Default)
+                var behaviorParams = _armAgent.GetComponent<BehaviorParameters>();
+                if (behaviorParams != null)
+                {
+                    behaviorParams.BehaviorType = BehaviorType.Default; // Or InferenceOnly
+                }
+            }
+
+            // Stop Session
+            if (_sessionCoroutine != null) StopCoroutine(_sessionCoroutine);
+            if (_demoRecorder != null) _demoRecorder.Record = false;
 
             // Re-enable Movement
             if (_locomotionSystem != null) _locomotionSystem.SetActive(true);
@@ -272,9 +383,6 @@ namespace UnityFactorySceneHDRP
 
             // Destroy Visuals
             if (_activeTrackingBall != null) Destroy(_activeTrackingBall);
-
-            // Save Recording
-            SaveRecordingToFile();
         }
 
         private void HandleDriveLogic()
@@ -290,22 +398,12 @@ namespace UnityFactorySceneHDRP
             _robotArmController.SetLiveTarget(targetPos, wristAngle);
 
             // Visuals
-            if (_activeTrackingBall) _activeTrackingBall.transform.position = targetPos;
-
-            // Record Frame
-            if (_csvRecording != null)
-            {
-                float time = Time.time - _recordingStartTime;
-                // Get Angles from IK Controller (which reads from Transforms)
-                float baseA = _robotArmController.out_BaseY;
-                float firstA = _robotArmController.out_FirstY;
-                float smallA = _robotArmController.out_SmallY;
-                float drillA = _robotArmController.out_DrillY;
-                // Claw state: we can use a float representation. 0 = Open, 1 = Closed.
-                float clawVal = _isGrabbing ? 1.0f : 0.0f;
-
-                _csvRecording.AppendLine($"{time:F4},{baseA:F4},{firstA:F4},{smallA:F4},{drillA:F4},{clawVal:F1}");
-            }
+            if (_activeTrackingBall) _activeTrackingBall.transform.position = targetPos; // was targetPos
+            
+            // --- CRITICAL FIX: FORCE AGENT STEP ---
+            // In Heuristic Mode, if DecisionRequester is slow or missing, we won't get updates.
+            // Since we are driving, we want 1:1 response.
+            _armAgent.RequestDecision();
         }
 
         [Header("Debug Settings")]
@@ -334,15 +432,17 @@ namespace UnityFactorySceneHDRP
             {
                 Debug.Log($"[VR_Imitation] Grabbing! (Value: {grabValue})");
                 _isGrabbing = true;
-                _armAgent.Grab();
-                _armAgent.SetClawState(true);
+                // _armAgent.Grab(); // REMOVED - Let Agent logic handle it via Signal
+                _armAgent.externalClawSignal = true; // Signal Agent to grab
+                // _armAgent.SetClawState(true); // Agent handles this in OnActionReceived
             }
             else if (!isPressing && _isGrabbing)
             {
                 Debug.Log($"[VR_Imitation] Releasing! (Value: {grabValue})");
                 _isGrabbing = false;
-                _armAgent.Release();
-                _armAgent.SetClawState(false);
+                // _armAgent.Release(); // REMOVED
+                 _armAgent.externalClawSignal = false; // Signal Agent to release
+                // _armAgent.SetClawState(false);
             }
 
             if (_showInputDebug)
@@ -353,20 +453,7 @@ namespace UnityFactorySceneHDRP
 
 
 
-        private void SaveRecordingToFile()
-        {
-            if (_csvRecording == null || _csvRecording.Length == 0) return;
 
-            string filename = $"RobotArm_Recording_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-            string path = Path.Combine(Application.persistentDataPath, "Recordings");
-            
-            if (!Directory.Exists(path)) Directory.CreateDirectory(path);
-            
-            string fullPath = Path.Combine(path, filename);
-            
-            File.WriteAllText(fullPath, _csvRecording.ToString());
-            Debug.Log($"[VR_Imitation] Recording saved to: {fullPath}");
-        }
 
         private void HandleMovementLogic()
         {
