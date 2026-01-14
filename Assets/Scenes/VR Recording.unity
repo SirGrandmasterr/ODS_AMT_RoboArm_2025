@@ -20558,6 +20558,10 @@ MonoBehaviour:
   _moveBinding: <XRController>/thumbstick
   _moveSpeed: 2
   _driveScale: 3
+  _controllerVisualsToHide:
+  - {fileID: 9173983156105835201}
+  - {fileID: 5895826685070422922}
+  _wristRotationOffset: 0
   _showInputDebug: 0
 --- !u!4 &6528530117756741936
 Transform:

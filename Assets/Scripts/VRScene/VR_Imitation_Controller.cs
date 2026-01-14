@@ -47,6 +47,12 @@ namespace UnityFactorySceneHDRP
         [Header("Drive Mode Settings")]
         [Tooltip("Scale of the player in Drive Mode (e.g., 2.0 for 2x size).")]
         [SerializeField] private float _driveScale = 1.0f;
+        
+        [Tooltip("Visuals to hide when driving (e.g. Controller Models).")]
+        [SerializeField] private List<GameObject> _controllerVisualsToHide;
+
+        [Tooltip("Offset for mapped wrist rotation.")]
+        [SerializeField] private float _wristRotationOffset = 0.0f;
 
         // Internal State
         private bool _isDriveMode = false;
@@ -130,6 +136,15 @@ namespace UnityFactorySceneHDRP
 
             _isDriveMode = true;
             Debug.Log("[VR_Imitation] Starting Drive Mode...");
+
+            // --- HIDE CONTROLLERS ---
+            if (_controllerVisualsToHide != null)
+            {
+                foreach (var visual in _controllerVisualsToHide)
+                {
+                    if (visual != null) visual.SetActive(false);
+                }
+            }
 
             // --- SAVE STATE ---
             if (_playerRoot != null)
@@ -228,6 +243,15 @@ namespace UnityFactorySceneHDRP
             _isDriveMode = false;
             Debug.Log("[VR_Imitation] Stopping Drive Mode...");
 
+            // --- SHOW CONTROLLERS ---
+            if (_controllerVisualsToHide != null)
+            {
+                foreach (var visual in _controllerVisualsToHide)
+                {
+                    if (visual != null) visual.SetActive(true);
+                }
+            }
+
             // Release Agent
             if(_armAgent) _armAgent.SetExternalControl(false);
 
@@ -259,8 +283,11 @@ namespace UnityFactorySceneHDRP
 
             Vector3 targetPos = _rightHandController.position;
 
+            // Map Controller Roll (Z) to Drill Y
+            float wristAngle = _rightHandController.localEulerAngles.z + _wristRotationOffset;
+            
             // Update IK
-            _robotArmController.SetLiveTarget(targetPos);
+            _robotArmController.SetLiveTarget(targetPos, wristAngle);
 
             // Visuals
             if (_activeTrackingBall) _activeTrackingBall.transform.position = targetPos;

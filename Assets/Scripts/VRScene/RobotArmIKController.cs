@@ -46,10 +46,10 @@ public class RobotArm_IK_Controller : MonoBehaviour
         StartCoroutine(PlaybackRoutine(relativePath));
     }
 
-    public void SetLiveTarget(Vector3 targetPos)
+    public void SetLiveTarget(Vector3 targetPos, float? targetDrillY = null)
     {
         // Direct IK solve for one frame
-        SolveIK(targetPos);
+        SolveIK(targetPos, targetDrillY);
         UpdateFKValues();
     }
 
@@ -113,13 +113,23 @@ public class RobotArm_IK_Controller : MonoBehaviour
         out_DrillY = GetRobustJointYAngle(smallSegmentDrill, 0f);
     }
 
-    private void SolveIK(Vector3 targetPos)
+    private void SolveIK(Vector3 targetPos, float? targetDrillY = null)
     {
         for (int i = 0; i < ikIterations; i++)
         {
             if (Vector3.Distance(endEffector.position, targetPos) < stopDistanceThreshold) break;
 
-            SolveJointRotation(smallSegmentDrill, targetPos, drillLimits, 0f);
+            if (targetDrillY.HasValue)
+            {
+                 // Direct Control with Limits
+                 float clampedY = Mathf.Clamp(NormalizeAngle(targetDrillY.Value), drillLimits.x, drillLimits.y);
+                 smallSegmentDrill.localRotation = Quaternion.Euler(0f, clampedY, 0f); // Assuming 0 offset
+            }
+            else
+            {
+                SolveJointRotation(smallSegmentDrill, targetPos, drillLimits, 0f);
+            }
+
             // RESTORED -180f offset here to fix the visual "floating" issue
             SolveJointRotation(smallSegment, targetPos, smallSegLimits, -180f);
             SolveJointRotation(firstSegment, targetPos, firstSegLimits, 0f);
