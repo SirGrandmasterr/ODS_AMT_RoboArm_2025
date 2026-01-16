@@ -1,0 +1,32 @@
+{
+    "lesson_number": {
+        "lesson_num": 0
+    },
+    "RoboArm": {
+        "checkpoints": [
+            {
+                "steps": 97087,
+                "file_path": "results/EikesTestRun/RoboArm/RoboArm-97087.onnx",
+                "reward": -1.0001000083776321,
+                "creation_time": 1767875023.217279,
+                "auxillary_file_paths": [
+                    "results/EikesTestRun/RoboArm/RoboArm-97087.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 97087,
+            "file_path": "results/EikesTestRun/RoboArm.onnx",
+            "reward": -1.0001000083776321,
+            "creation_time": 1767875023.217279,
+            "auxillary_file_paths": [
+                "results/EikesTestRun/RoboArm/RoboArm-97087.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.1.0",
+        "torch_version": "2.8.0"
+    }
+}

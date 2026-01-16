@@ -1,0 +1,68 @@
+{
+    "lesson_number": {
+        "lesson_num": 2
+    },
+    "RoboArm": {
+        "checkpoints": [
+            {
+                "steps": 999998,
+                "file_path": "results/FirstVisualTest/RoboArm/RoboArm-999998.onnx",
+                "reward": -0.848109111745315,
+                "creation_time": 1768137287.0645618,
+                "auxillary_file_paths": [
+                    "results/FirstVisualTest/RoboArm/RoboArm-999998.pt"
+                ]
+            },
+            {
+                "steps": 1467038,
+                "file_path": "results/FirstVisualTest/RoboArm/RoboArm-1467038.onnx",
+                "reward": null,
+                "creation_time": 1768157103.5168781,
+                "auxillary_file_paths": [
+                    "results/FirstVisualTest/RoboArm/RoboArm-1467038.pt"
+                ]
+            },
+            {
+                "steps": 1499972,
+                "file_path": "results/FirstVisualTest/RoboArm/RoboArm-1499972.onnx",
+                "reward": 1.0734232135890227,
+                "creation_time": 1768409483.397917,
+                "auxillary_file_paths": [
+                    "results/FirstVisualTest/RoboArm/RoboArm-1499972.pt"
+                ]
+            },
+            {
+                "steps": 1999997,
+                "file_path": "results/FirstVisualTest/RoboArm/RoboArm-1999997.onnx",
+                "reward": 2.5379559721951774,
+                "creation_time": 1768423508.0091069,
+                "auxillary_file_paths": [
+                    "results/FirstVisualTest/RoboArm/RoboArm-1999997.pt"
+                ]
+            },
+            {
+                "steps": 2029794,
+                "file_path": "results/FirstVisualTest/RoboArm/RoboArm-2029794.onnx",
+                "reward": 2.6336349844193045,
+                "creation_time": 1768424622.58417,
+                "auxillary_file_paths": [
+                    "results/FirstVisualTest/RoboArm/RoboArm-2029794.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 2029794,
+            "file_path": "results/FirstVisualTest/RoboArm.onnx",
+            "reward": 2.6336349844193045,
+            "creation_time": 1768424622.58417,
+            "auxillary_file_paths": [
+                "results/FirstVisualTest/RoboArm/RoboArm-2029794.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.1.0",
+        "torch_version": "2.8.0"
+    }
+}
