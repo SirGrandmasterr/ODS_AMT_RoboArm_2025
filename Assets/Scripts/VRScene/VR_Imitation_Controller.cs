@@ -79,8 +79,7 @@ namespace UnityFactorySceneHDRP
         
         // State Backup
         private bool _wasDemoMode = false;
-        private bool _wasManualMode = false;
-
+    
         // Input Actions
         private InputAction _toggleDriveAction;
         private InputAction _grabAction;

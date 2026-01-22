@@ -11,6 +11,9 @@ public class ArmAgent_RL : Agent
     [Header("Environment Connection")]
     [Tooltip("Drag the SortingEnvironment object here.")]
     [SerializeField] private SortingEnvironment environment;
+    
+    [Header("Initialization Config")]
+    [SerializeField] private InitializationConfig initConfig;
 
     [Header("Arm Joints (Transforms)")]
     [SerializeField] private Transform armbase;
@@ -59,7 +62,7 @@ public class ArmAgent_RL : Agent
             // Then try finding it globally (fallback)
             if (environment == null)
             {
-                environment = FindObjectOfType<SortingEnvironment>();
+                environment = FindFirstObjectByType<SortingEnvironment>();
             }
 
             if (environment == null)
@@ -85,6 +88,11 @@ public class ArmAgent_RL : Agent
             if (endEffectorRb == null) endEffectorRb = endEffector.gameObject.AddComponent<Rigidbody>();
             endEffectorRb.isKinematic = true; 
         }
+        
+        if (initConfig == null) initConfig = GetComponent<InitializationConfig>();
+        
+        // Safety: Ensure MaxStep is not 0 (infinite)
+        if (MaxStep == 0) MaxStep = 5000;
     }
 
     public override void OnEpisodeBegin()
@@ -150,7 +158,7 @@ public class ArmAgent_RL : Agent
     public override void OnActionReceived(ActionBuffers actions)
     {
         // --- 1. MOVEMENT ---
-        float rotationSpeed = 100f; 
+        float rotationSpeed = 300f; 
         float dt = Time.fixedDeltaTime;
         
         currentBaseYRotation += actions.ContinuousActions[0] * dt * rotationSpeed;
@@ -276,7 +284,7 @@ public class ArmAgent_RL : Agent
 
     private void FixedUpdate()
     {
-        if (Time.frameCount % 60 == 0) Debug.Log($"[ArmAgent_RL] FixedUpdate Running. BaseRot: {currentBaseYRotation:F2}");
+
         ApplyRotationsToTransforms();
         ApplyClawRotations();
     }
@@ -285,10 +293,21 @@ public class ArmAgent_RL : Agent
     
     private void ResetJointRotations()
     {
-        currentBaseYRotation = Random.Range(baseRotationLimits.x, baseRotationLimits.y);
-        currentFirstSegmentYRotation = Random.Range(firstSegmentRotationLimits.x, firstSegmentRotationLimits.y);
-        currentSmallSegmentYRotation = Random.Range(smallSegmentRotationLimits.x, smallSegmentRotationLimits.y);
-        currentSmallSegmentDrillYRotation = Random.Range(drillRotationLimits.x, drillRotationLimits.y);
+        if (initConfig != null)
+        {
+            initConfig.GetStartRotations(
+                baseRotationLimits, firstSegmentRotationLimits, smallSegmentRotationLimits, drillRotationLimits,
+                out currentBaseYRotation, out currentFirstSegmentYRotation, out currentSmallSegmentYRotation, out currentSmallSegmentDrillYRotation
+            );
+        }
+        else
+        {
+            currentBaseYRotation = Random.Range(baseRotationLimits.x, baseRotationLimits.y);
+            currentFirstSegmentYRotation = Random.Range(firstSegmentRotationLimits.x, firstSegmentRotationLimits.y);
+            currentSmallSegmentYRotation = Random.Range(smallSegmentRotationLimits.x, smallSegmentRotationLimits.y);
+            currentSmallSegmentDrillYRotation = Random.Range(drillRotationLimits.x, drillRotationLimits.y);
+        }
+        
         claw1XRotation = -90.0f;
         claw2XRotation = 90.0f;
     }

@@ -52,7 +52,7 @@ public class ArmAgent_Demo : Agent
             environment = GetComponent<SortingEnvironment_Demo>();
             if (environment == null)
             {
-                environment = FindObjectOfType<SortingEnvironment_Demo>();
+                environment = FindFirstObjectByType<SortingEnvironment_Demo>();
             }
 
             if (environment == null)

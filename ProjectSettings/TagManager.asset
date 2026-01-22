@@ -8,6 +8,7 @@ TagManager:
   - TargetLocation
   - TargetBinPlastic
   - TargetBinAluminum
+  - Ground
   layers:
   - Default
   - TransparentFX

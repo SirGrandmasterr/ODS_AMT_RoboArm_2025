@@ -10,7 +10,7 @@ public class ArmAgent_Recording : Agent
 {
     [Header("Environment Connection")]
     [Tooltip("Drag the SortingEnvironment object here.")]
-    [SerializeField] private SortingEnvironment environment;
+    [SerializeField] private SortingEnvironment_Recording environment;
 
     [Header("Initialization Config")]
     [SerializeField] private InitializationConfig initConfig;
@@ -59,8 +59,15 @@ public class ArmAgent_Recording : Agent
     // External Control State
     private bool _isExternallyControlled = false;
 
+    // Public Accessors
+    public Transform EndEffector => endEffector;
+
     // Events
-    public event Action OnEpisodeEnded;
+    // Events
+    public delegate void EpisodeCompleteHandler(bool success, int stepCount);
+    public event EpisodeCompleteHandler OnEpisodeCompleted;
+    
+    private int _currentStepCount = 0;
 
     public void SetIKController(RobotArm_IK_Controller controller)
     {
@@ -77,11 +84,11 @@ public class ArmAgent_Recording : Agent
         // 1. Check Environment
         if (environment == null)
         {
-            environment = GetComponent<SortingEnvironment>();
-            if (environment == null) environment = FindObjectOfType<SortingEnvironment>();
+            environment = GetComponent<SortingEnvironment_Recording>();
+            if (environment == null) environment = FindFirstObjectByType<SortingEnvironment_Recording>();
             if (environment == null)
             {
-                Debug.LogError($"<color=red><b>[ArmAgent_Recording] FATAL ERROR:</b> 'Environment' field is not assigned and no SortingEnvironment found in scene!</color>", this);
+                Debug.LogError($"<color=red><b>[ArmAgent_Recording] FATAL ERROR:</b> 'Environment' field is not assigned and no SortingEnvironment_Recording found in scene!</color>", this);
             }
         }
 
@@ -110,7 +117,12 @@ public class ArmAgent_Recording : Agent
         if (environment == null) return; 
 
         // Invoke event for VR Controller/Recorder
-        OnEpisodeEnded?.Invoke();
+        // Invoke event for VR Controller/Recorder
+        // We can't know success state here easily as it's the START of a new one, 
+        // so this event was likely intended for "Episode Ended" logic.
+        // We will move the invocation to EndEpisode calls.
+        
+        _currentStepCount = 0;
 
         // 1. Reset Environment Logic
         environment.ResetEnvironment();
@@ -173,7 +185,9 @@ public class ArmAgent_Recording : Agent
         // it supposedly "Outputted" (via Heuristic).
         // So we keep this active.
         
-        float rotationSpeed = 100f; 
+        // So we keep this active.
+        
+        float rotationSpeed = 300f; 
         float dt = Time.fixedDeltaTime;
         
         currentBaseYRotation += actions.ContinuousActions[0] * dt * rotationSpeed;
@@ -254,11 +268,17 @@ public class ArmAgent_Recording : Agent
                 if (environment.CheckPlacementSuccess())
                 {
                     AddReward(5.0f);
+                    environment.PlaySuccessSound();
+                    AddReward(5.0f);
+                    environment.PlaySuccessSound();
+                    OnEpisodeCompleted?.Invoke(true, _currentStepCount);
                     EndEpisode();
                 }
                 else if (environment.CheckPlacementFailure())
                 {
                     AddReward(-2.0f);
+                    AddReward(-2.0f);
+                    OnEpisodeCompleted?.Invoke(false, _currentStepCount);
                     EndEpisode();
                 }
             }
@@ -271,7 +291,9 @@ public class ArmAgent_Recording : Agent
             if (!environment.IsInBinZone())
             {
                  if (environment.CurrentLessonNumber >= 1f) AddReward(-1.0f);
-                 EndEpisode();
+                 AddReward(-1.0f);
+            OnEpisodeCompleted?.Invoke(false, _currentStepCount);
+            EndEpisode();
             }
         }
     }
@@ -281,6 +303,7 @@ public class ArmAgent_Recording : Agent
         if (hitTag == "Conveyor" || hitTag == "RobotPart" || hitTag == "Ground")
         {
             AddReward(-1.0f); 
+            OnEpisodeCompleted?.Invoke(false, _currentStepCount);
             EndEpisode();
         }
     }
@@ -300,6 +323,7 @@ public class ArmAgent_Recording : Agent
         }
         
         ApplyClawRotations();
+        _currentStepCount++;
     }
 
     // --- Helpers ---

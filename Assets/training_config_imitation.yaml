@@ -22,10 +22,11 @@ behaviors:
       gail:
         gamma: 0.99
         strength: 0.5
-        demo_path: Assets/Demonstrations/ # Ensure this matches where files are saved
+        demo_path: ../../Demonstrations/RecordingTest012.demo # Ensure this matches where files are saved
     behavioral_cloning:
       strength: 0.5
-      demo_path: Assets/Demonstrations/
+      steps: 500000 # Decay BC over first 500k steps
+      demo_path: ../../Demonstrations/RecordingTest012.demo
     max_steps: 10000000
     time_horizon: 64
     summary_freq: 10000
@@ -51,14 +52,14 @@ environment_parameters:
           signal_smoothing: true
         value: 1.0
 
-      - name: Lesson3_Place
-        completion_criteria:
-          measure: reward
-          behavior: RoboArm
-          threshold: 5.85 
-          min_lesson_length: 100
-          signal_smoothing: true
-        value: 2.0
+      #- name: Lesson3_Place
+      #  completion_criteria:
+      #    measure: reward
+      #    behavior: RoboArm
+      #    threshold: 5.85 
+      #    min_lesson_length: 100
+      #    signal_smoothing: true
+      #  value: 2.0
 
       - name: Lesson4_FullTask
         completion_criteria:
@@ -67,4 +68,4 @@ environment_parameters:
           threshold: 7.0
           min_lesson_length: 100
           signal_smoothing: true
-        value: 3.0
+        value: 3.0 # Matches your Demo
