@@ -1,0 +1,50 @@
+{
+    "lesson_number": {
+        "lesson_num": 3
+    },
+    "RoboArmIK": {
+        "checkpoints": [
+            {
+                "steps": 499984,
+                "file_path": "results\\ppo\\RoboArmIK\\RoboArmIK-499984.onnx",
+                "reward": 2.471916245143922,
+                "creation_time": 1769089772.7195485,
+                "auxillary_file_paths": [
+                    "results\\ppo\\RoboArmIK\\RoboArmIK-499984.pt"
+                ]
+            },
+            {
+                "steps": 999963,
+                "file_path": "results\\ppo\\RoboArmIK\\RoboArmIK-999963.onnx",
+                "reward": 8.56267370161463,
+                "creation_time": 1769090181.922237,
+                "auxillary_file_paths": [
+                    "results\\ppo\\RoboArmIK\\RoboArmIK-999963.pt"
+                ]
+            },
+            {
+                "steps": 1073287,
+                "file_path": "results\\ppo\\RoboArmIK\\RoboArmIK-1073287.onnx",
+                "reward": 8.6047068530438,
+                "creation_time": 1769090245.850166,
+                "auxillary_file_paths": [
+                    "results\\ppo\\RoboArmIK\\RoboArmIK-1073287.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 1073287,
+            "file_path": "results\\ppo\\RoboArmIK.onnx",
+            "reward": 8.6047068530438,
+            "creation_time": 1769090245.850166,
+            "auxillary_file_paths": [
+                "results\\ppo\\RoboArmIK\\RoboArmIK-1073287.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.1.0",
+        "torch_version": "2.2.2+cu121"
+    }
+}

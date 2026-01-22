@@ -32,10 +32,18 @@ public class SortingEnvironment : MonoBehaviour
     
     private Quaternion initialBottleRot;
 
+    private Bounds spawnBounds;
+
     private void Awake()
     {
         if (bottle) initialBottleRot = bottle.rotation;
         if (bottleRb) bottleRb.sleepThreshold = 0.0f;
+        
+        if (randomizationArea)
+        {
+            spawnBounds = randomizationArea.bounds;
+            randomizationArea.enabled = false;
+        }
     }
 
     /// <summary>
@@ -63,7 +71,8 @@ public class SortingEnvironment : MonoBehaviour
     {
         // Lesson 0: Reach - Bottle spawns in random spot, bins disabled. 
         // Goal: Just get close to the bottle.
-        ResetBottlePhysics(GetRandomSpawnPos(randomizationArea.bounds, 0.1f), true);
+        Bounds smallerBounds = new Bounds(bottleSpawnPoint.position, spawnBounds.size * 0.5f);
+        ResetBottlePhysics(GetRandomSpawnPos(smallerBounds, 0.1f), false);
         SetBottleMaterial(BottleTargetSorting_Curriculum.MaterialType.Plastic);
         
         if(targetBinAluminum) targetBinAluminum.gameObject.SetActive(false);
@@ -74,7 +83,7 @@ public class SortingEnvironment : MonoBehaviour
     {
         // Lesson 1: Grab - Spawns in smaller area. Goal: Pick it up.
         // Derived from original: Bounds smallerBounds = new Bounds(bottleSpawnPoint.position, randomizationArea.bounds.size * 0.5f);
-        Bounds smallerBounds = new Bounds(bottleSpawnPoint.position, randomizationArea.bounds.size * 0.5f);
+        Bounds smallerBounds = new Bounds(bottleSpawnPoint.position, spawnBounds.size * 0.5f);
         ResetBottlePhysics(GetRandomSpawnPos(smallerBounds, 0.1f), false);
         SetBottleMaterial(BottleTargetSorting_Curriculum.MaterialType.Plastic);
 
@@ -85,15 +94,6 @@ public class SortingEnvironment : MonoBehaviour
     private void SetupLesson_Place(Transform agentEndEffector = null)
     {
         // Lesson 2: Place - Starts held by agent (or at agent pos). 
-        // Note: For pure separation, if we want the Agent to HOLD it, the Agent needs to do the "ForceGrab".
-        // Here we just position it. The Agent script calls ForceGrab if it detects this lesson, OR we provide a helper.
-        // For side-by-side, we'll position it at the spawn point for now, or we need the Agent's EE position.
-        // Implementation Choice: Agent will handle the "Attach" part, Env positions it.
-        // Actually, original code used: ResetBottlePhysics(endEffector.position, true);
-        // We will put it at a fixed spawn point if EE unknown, or let Agent handle it. 
-        // BETTER: Use spawn point for simplicity in this refactor, strictly checking bins.
-        // However, standard curriculum implies starting GRABBED.
-        // We will default to spawn point, but Agent should override if it wants to grab immediately.
         
         // Strategy: Reset to Spawn Point, but ensure bins are active.
         ResetBottlePhysics(bottleSpawnPoint.position, true);
@@ -124,6 +124,7 @@ public class SortingEnvironment : MonoBehaviour
         {
             bottleRb.linearVelocity = Vector3.zero;
             bottleRb.angularVelocity = Vector3.zero;
+            bottleRb.WakeUp();
         }
         
         // Reset hierarchy if it was held

@@ -6,7 +6,7 @@ using Unity.MLAgents.Sensors;
 using Random = UnityEngine.Random;
 
 [RequireComponent(typeof(DecisionRequester))]
-public class ArmAgent_IK_Fixed : Agent
+public class ArmAgent_IK : Agent
 {
     [Header("Environment Connection")]
     [Tooltip("Drag the SortingEnvironment object here.")]
@@ -50,7 +50,8 @@ public class ArmAgent_IK_Fixed : Agent
     // Reward Tracking
     private float previousDistanceToBottle;
     private float previousDistanceToBin;
-    private float initialDistanceToBottle; // NEW: Used for normalization
+    
+    private int defaultMaxStep;
 
     public override void Initialize()
     {
@@ -81,6 +82,7 @@ public class ArmAgent_IK_Fixed : Agent
         
         // Safety
         if (MaxStep == 0) MaxStep = 5000;
+        defaultMaxStep = MaxStep;
         
         // Init state
         claw1XRotation = -90.0f;
@@ -94,8 +96,34 @@ public class ArmAgent_IK_Fixed : Agent
         // 1. Reset Environment Logic
         environment.ResetEnvironment();
 
+        // Adjust MaxStep based on lesson
+        // Lesson 0 (Reach) should be quicker to fail if stuck provided it is simple
+        // or just less steps allowed as per request.
+        if (environment.CurrentLessonNumber == 0f)
+        {
+            MaxStep = 5000;
+        }
+        else
+        {
+            MaxStep = defaultMaxStep;
+        }
+
         // 2. Reset Robot State (via Forward Kinematics first, then IK Sync)
-        ResetAndApplyJointRotations();
+        ResetAndApplyJointRotations(); // This resets arm joints
+        
+        // Reset Claw State based on Lesson
+        if (environment.CurrentLessonNumber == 2f) 
+        {
+             // Start Closed for "Place" lesson
+             claw1XRotation = -28.0f;
+             claw2XRotation = 28.0f;
+        }
+        else
+        {
+             // Start Open
+             claw1XRotation = -90.0f;
+             claw2XRotation = 90.0f;
+        }
         
         // NOW read the physical position to set the IK Target
         // This ensures smoothness and respects the InitializationConfig
@@ -114,13 +142,15 @@ public class ArmAgent_IK_Fixed : Agent
         }
 
         // 4. Initialize Rewards
-        previousDistanceToBottle = Vector3.Distance(endEffector.position, environment.bottle.position);
-        initialDistanceToBottle = previousDistanceToBottle; // Store initial distance
+        previousDistanceToBottle = Vector3.Distance(currentTargetPosition, environment.bottle.position);
         previousDistanceToBin = environment.GetHorizontalDistanceToBin(environment.bottle.position);
     }
 
     public override void CollectObservations(VectorSensor sensor)
     {
+        // REMOVED 5 Joint Observations as per request for IK agent
+        // The agent operates in Cartesian space and doesn't need to know internal joint angles. 
+
         // 1 Material
         sensor.AddObservation((int)environment.bottleScript.material);
 
@@ -133,17 +163,18 @@ public class ArmAgent_IK_Fixed : Agent
         // 3 Relative Vector to target
         sensor.AddObservation(environment.bottle.position - endEffector.position); 
 
-        // 3 Bottle Orientation
-        sensor.AddObservation(environment.bottle.up);
-
         // 1 Holding State
         sensor.AddObservation(IsHoldingObject());
 
         // 1 Lesson
         sensor.AddObservation(environment.CurrentLessonNumber);
         
-        // 3 IK Target Error
+        // 3 IK Target Error (Optional, helps agent know where it's trying to go vs where it is)
         sensor.AddObservation(currentTargetPosition - endEffector.position);
+
+        // 1 Claw Rotation (Normalized) - CRITICAL for agent to know tool state
+        // -90 is Open (0), -28 is Closed (1)
+        sensor.AddObservation(Mathf.InverseLerp(-90f, -28f, claw1XRotation));
     }
 
     public override void OnActionReceived(ActionBuffers actions)
@@ -151,6 +182,7 @@ public class ArmAgent_IK_Fixed : Agent
         float dt = Time.fixedDeltaTime;
 
         // --- 1. MOVEMENT (IK Target) ---
+        // Actions 0, 1, 2: XYZ Movement
         float moveX = actions.ContinuousActions[0];
         float moveY = actions.ContinuousActions[1];
         float moveZ = actions.ContinuousActions[2];
@@ -158,7 +190,7 @@ public class ArmAgent_IK_Fixed : Agent
         Vector3 moveDelta = new Vector3(moveX, moveY, moveZ) * moveSpeed * dt;
         currentTargetPosition += moveDelta;
 
-        // Clamp Target to Workspace Bounds
+        // Clamp Target to Workspace Bounds if provided
         if (workspaceBounds != null)
         {
             currentTargetPosition = workspaceBounds.bounds.ClosestPoint(currentTargetPosition);
@@ -171,13 +203,15 @@ public class ArmAgent_IK_Fixed : Agent
         // Apply to IK Controller
         ikController.SetLiveTarget(currentTargetPosition, currentSmallSegmentDrillYRotation);
         
+        // Updates the claw transforms manually (visual only, logic is below)
         ApplyClawRotations();
+
 
         // --- 2. CLAW LOGIC ---
         float clawInput = actions.ContinuousActions[4];
         bool wasHolding = IsHoldingObject();
 
-        if (clawInput > 0.5f) // Close
+        if (clawInput > 0.0f) // Close
         {
             claw1XRotation = -28.0f;
             claw2XRotation = 28.0f;
@@ -189,8 +223,7 @@ public class ArmAgent_IK_Fixed : Agent
                     AddReward(2.0f);
                     if (environment.CurrentLessonNumber == 1f) 
                     {
-                        Debug.Log($"<color=green>[ArmAgent_IK] WIN: Grabbed Bottle in Lesson 1! Reward: {GetCumulativeReward():F2}</color>");
-                        EndEpisode();
+                        FinishEpisode(true, "Lesson 1 Success: Grabbed Bottle");
                     }
                 }
             }
@@ -206,39 +239,22 @@ public class ArmAgent_IK_Fixed : Agent
                 if (environment.CurrentLessonNumber >= 2f && !environment.IsInBinZone())
                 {
                     AddReward(-1.0f);
-                    EndEpisode();
+                    FinishEpisode(false, "Premature Release (Lesson 2+)");
                     return;
                 }
             }
         }
 
         // --- 3. REWARDS ---
-        float currentDistanceToBottle = Vector3.Distance(endEffector.position, environment.bottle.position);
+        // Reuse logic from RL agent
+        float currentDistanceToBottle = Vector3.Distance(currentTargetPosition, environment.bottle.position);
         float currentDistanceToBin = environment.GetHorizontalDistanceToBin(environment.bottle.position);
 
         if (environment.CurrentLessonNumber == 0f) // Reach
         {
-            // FIX: Normalize the delta so the total reward for closing the distance is always 1.0.
-            float rawDelta = previousDistanceToBottle - currentDistanceToBottle;
-            
-            // Prevent division by zero if initial distance is extremely small
-            float distDenominator = Mathf.Max(initialDistanceToBottle, 0.001f);
-            
-            // Normalize: Moving 1 unit is worth (1 / TotalDistance)
-            float normalizedDelta = rawDelta / distDenominator;
-
-            // FIX: Clamp to prevent physics explosions from giving massive rewards
-            // Assuming max speed * dt is small, this clamp should be safe.
-            // e.g. if max speed is 1m/s and dt is 0.02, max move is 0.02. 
-            // 0.02 / 1.0 (dist) = 0.02 reward. 
-            // We clamp strictly to avoid teleportation exploits.
-            AddReward(Mathf.Clamp(normalizedDelta, -0.1f, 0.1f)); 
-
-            if (currentDistanceToBottle < 0.05f) 
-            { 
-                AddReward(1.0f); // Bonus for completion
-                EndEpisode(); 
-            }
+            float delta = previousDistanceToBottle - currentDistanceToBottle;
+            AddReward(delta);
+            if (currentDistanceToBottle < 0.05f) { AddReward(1.0f); FinishEpisode(true, "Lesson 0 Success: Reached Target"); }
         }
         else // Grab / Place / Full
         {
@@ -269,12 +285,12 @@ public class ArmAgent_IK_Fixed : Agent
                 if (environment.CheckPlacementSuccess())
                 {
                     AddReward(5.0f);
-                    EndEpisode();
+                    FinishEpisode(true, "Lesson 2+ Success: Placed in Correct Bin");
                 }
                 else if (environment.CheckPlacementFailure())
                 {
                     AddReward(-2.0f);
-                    EndEpisode();
+                    FinishEpisode(false, "Lesson 2+ Failure: Placed in Wrong Bin");
                 }
             }
         }
@@ -284,28 +300,45 @@ public class ArmAgent_IK_Fixed : Agent
         {
             if (!environment.IsInBinZone())
             {
-                 // FIX: Ensure penalty cancels out any potential gain from "pushing" the bottle off
                  if (environment.CurrentLessonNumber >= 1f) AddReward(-1.0f);
-                 EndEpisode();
+                 FinishEpisode(false, "Failure: Bottle Fell Out of Bounds");
             }
+        }
+
+        if (StepCount >= MaxStep)
+        {
+            FinishEpisode(false, "Max Steps Reached");
         }
     }
 
     public void OnPartCollision(string hitTag)
     {
         if (hitTag == "Conveyor" || hitTag == "RobotPart" || hitTag == "Ground")
-        {
-            // FIX: -1.0 is now mathematically stronger because max travel reward is normalized to +1.0.
-            // So a suicide dive (travel +1, crash -1) yields 0 net reward, discouraging the behavior.
+        {  
+            Debug.Log($"<color=red>[ArmAgent_IK] Collision ({hitTag}).</color>");
             AddReward(-1.0f); 
-            EndEpisode();
+            Debug.Log($"<color=red>[ArmAgent_IK] Collision ({hitTag}).</color>");
+            AddReward(-1.0f); 
+            FinishEpisode(false, $"Collision with {hitTag}");
         }
     }
 
     public void OnBottleHitGround()
     {
-        Debug.Log($"<color=red>[ArmAgent_IK] FAILED: Bottle hit ground (Collision).</color>");
         AddReward(-1.0f);
+        FinishEpisode(false, "Failure: Bottle Hit Ground");
+    }
+
+    private void FinishEpisode(bool success, string reason = "")
+    {
+        float reward = GetCumulativeReward();
+        int steps = StepCount;
+        float lesson = environment != null ? environment.CurrentLessonNumber : 0f;
+        string result = success ? "SUCCESS" : "FAILURE";
+        string color = success ? "green" : "red";
+        
+        Debug.Log($"<color={color}>[ArmAgent_IK] Episode Finished. Lesson: {lesson} | Result: {result} | Reward: {reward:F2} | Steps: {steps} | Reason: {reason}</color>");
+        
         EndEpisode();
     }
 
@@ -317,6 +350,8 @@ public class ArmAgent_IK_Fixed : Agent
 
         if (initConfig != null)
         {
+            // Use Limits from Controller or hardcode if not exposed nicely. 
+            // IK Controller has limits public.
             initConfig.GetStartRotations(
                 ikController.baseLimits, ikController.firstSegLimits, ikController.smallSegLimits, ikController.drillLimits,
                 out baseY, out firstY, out smallY, out drillY
@@ -324,18 +359,28 @@ public class ArmAgent_IK_Fixed : Agent
         }
         else
         {
+            // Fallback safe defaults
              baseY = 0f;
              firstY = -45f;
              smallY = -45f;
              drillY = 0f;
         }
 
+        // Apply immediately
         if (armbase) armbase.localRotation = Quaternion.Euler(0f, baseY, 0f);
         if (firstSegment) firstSegment.localRotation = Quaternion.Euler(0f, firstY, 0f);
+        
+        // Note: Small Segment usually has -180 offset in this setup, check RobotArm_IK_Controller.UpdateFKValues
+        // Controller uses: smallSegment.localRotation = Quaternion.Euler(-180f, currentSmallSegmentYRotation, 0f);
+        // So we must apply that offset here too.
         if (smallSegment) smallSegment.localRotation = Quaternion.Euler(-180f, smallY, 0f);
+        
         if (smallSegmentDrill) smallSegmentDrill.localRotation = Quaternion.Euler(0f, drillY, 0f);
         
+        // Sync State Variables
         currentSmallSegmentDrillYRotation = drillY;
+        
+        // IMPORTANT: Force Unity to update transforms so EndEffector position is valid immediately
         Physics.SyncTransforms(); 
     }
 
@@ -389,19 +434,26 @@ public class ArmAgent_IK_Fixed : Agent
     public override void Heuristic(in ActionBuffers actionsOut)
     {
         var continuousActions = actionsOut.ContinuousActions;
-        float moveX = 0f; float moveY = 0f; float moveZ = 0f;
+        
+        // Map WASD and QE to XYZ movement
+        float moveX = 0f;
+        float moveY = 0f;
+        float moveZ = 0f;
 
         if (Input.GetKey(KeyCode.D)) moveX = 1f;
         if (Input.GetKey(KeyCode.A)) moveX = -1f;
+        
         if (Input.GetKey(KeyCode.W)) moveZ = 1f;
         if (Input.GetKey(KeyCode.S)) moveZ = -1f;
+        
         if (Input.GetKey(KeyCode.Q)) moveY = 1f;
         if (Input.GetKey(KeyCode.E)) moveY = -1f;
 
-        continuousActions[0] = moveX;
-        continuousActions[1] = moveY;
-        continuousActions[2] = moveZ;
-        continuousActions[3] = Input.GetKey(KeyCode.RightArrow) ? 1f : (Input.GetKey(KeyCode.LeftArrow) ? -1f : 0f);
-        continuousActions[4] = Input.GetKey(KeyCode.Space) ? 1.0f : -1.0f;
+        continuousActions[0] = moveX; // X
+        continuousActions[1] = moveY; // Y
+        continuousActions[2] = moveZ; // Z
+
+        continuousActions[3] = Input.GetKey(KeyCode.RightArrow) ? 1f : (Input.GetKey(KeyCode.LeftArrow) ? -1f : 0f); // Drill
+        continuousActions[4] = Input.GetKey(KeyCode.Space) ? 1.0f : -1.0f; // Claw
     }
 }

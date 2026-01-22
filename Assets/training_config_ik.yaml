@@ -28,9 +28,9 @@ environment_parameters:
     curriculum:
       - name: Lesson1_Reach
         completion_criteria:
-          measure: progress
+          measure: reward
           behavior: RoboArmIK
-          threshold: 0.1
+          threshold: 3.5
           min_lesson_length: 100
           signal_smoothing: true
         value: 0.0
@@ -39,7 +39,7 @@ environment_parameters:
         completion_criteria:
           measure: progress
           behavior: RoboArmIK
-          threshold: 0.1
+          threshold: 0.01
           min_lesson_length: 100
           signal_smoothing: true
         value: 1.0

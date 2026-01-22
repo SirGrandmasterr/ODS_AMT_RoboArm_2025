@@ -28,8 +28,8 @@ public class RobotArm_IK_Controller : MonoBehaviour
 
     [Header("Rotation Limits (Must match Agent)")]
     public Vector2 baseLimits = new Vector2(-180f, 180f);
-    public Vector2 firstSegLimits = new Vector2(-90f, 90f);
-    public Vector2 smallSegLimits = new Vector2(-90f, 90f);
+    public Vector2 firstSegLimits = new Vector2(-180f, 180f);
+    public Vector2 smallSegLimits = new Vector2(-180f, 180f);
     public Vector2 drillLimits = new Vector2(-180f, 180f);
 
     [Header("Debug Output")]
