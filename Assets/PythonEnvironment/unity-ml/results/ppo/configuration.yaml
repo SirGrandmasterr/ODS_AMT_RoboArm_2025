@@ -35,6 +35,22 @@ behaviors:
           memory: null
           goal_conditioning_type: hyper
           deterministic: false
+      gail:
+        gamma: 0.99
+        strength: 0.5
+        network_settings:
+          normalize: false
+          hidden_units: 128
+          num_layers: 2
+          vis_encode_type: simple
+          memory: null
+          goal_conditioning_type: hyper
+          deterministic: false
+        learning_rate: 0.0003
+        encoding_size: null
+        use_actions: false
+        use_vail: false
+        demo_path: ../../Demonstrations/SortingDemoUserI.demo
     init_path: null
     keep_checkpoints: 5
     even_checkpoints: false
@@ -43,7 +59,13 @@ behaviors:
     summary_freq: 10000
     threaded: false
     self_play: null
-    behavioral_cloning: null
+    behavioral_cloning:
+      demo_path: ../../Demonstrations/SortingDemoUserI.demo
+      steps: 500000
+      strength: 0.5
+      samples_per_update: 0
+      num_epoch: null
+      batch_size: null
 env_settings:
   env_path: null
   env_args: null
@@ -70,46 +92,7 @@ environment_parameters:
     - value:
         sampler_type: constant
         sampler_parameters:
-          seed: 7722
-          value: 0.0
-      name: Lesson1_Reach
-      completion_criteria:
-        behavior: RoboArmIK
-        measure: reward
-        min_lesson_length: 100
-        signal_smoothing: true
-        threshold: 3.5
-        require_reset: false
-    - value:
-        sampler_type: constant
-        sampler_parameters:
-          seed: 7723
-          value: 1.0
-      name: Lesson2_Grab
-      completion_criteria:
-        behavior: RoboArmIK
-        measure: progress
-        min_lesson_length: 100
-        signal_smoothing: true
-        threshold: 0.01
-        require_reset: false
-    - value:
-        sampler_type: constant
-        sampler_parameters:
-          seed: 7724
-          value: 2.0
-      name: Lesson3_Place
-      completion_criteria:
-        behavior: RoboArmIK
-        measure: reward
-        min_lesson_length: 100
-        signal_smoothing: true
-        threshold: 5.5
-        require_reset: false
-    - value:
-        sampler_type: constant
-        sampler_parameters:
-          seed: 7725
+          seed: 7120
           value: 3.0
       name: Lesson4_FullTask
       completion_criteria:

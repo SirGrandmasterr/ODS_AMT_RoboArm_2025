@@ -6,5 +6,9 @@ win-direct:
 
 win-IK:
 	python -m poetry run mlagents-learn ..\..\training_config_ik.yaml --force
+
+win-IK-imitation:
+	python -m poetry run mlagents-learn ..\..\training_config_ik_imitation.yaml --force
+
 win-imitation:
 	python -m poetry run mlagents-learn ..\..\training_config_imitation.yaml --force
