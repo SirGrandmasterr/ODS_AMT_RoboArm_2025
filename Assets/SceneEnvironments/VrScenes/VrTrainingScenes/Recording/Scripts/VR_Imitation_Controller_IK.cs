@@ -219,19 +219,19 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
             _armAgent.enabled = true;
             _armAgent.preventSpawning = false; // Allow bottle spawn
             
-            // Explicitly Close to reset internal writer state (LazyInitialize will be called next Update)
-            _demoRecorder.Close();
-
-            // Set Absolute Directory and Simple Name
+            // 1. Manually Reset Environment/State
+            // calling EndEpisode() here raises a "Done" flag which creates a ghost episode.
+            // So we manually call OnEpisodeBegin to reset logic without triggering the ML-Agents EndEpisode cycle.
+            _armAgent.OnEpisodeBegin(); 
+            
+            // 2. NOW Enable Recorder
+            _demoRecorder.Close(); // Ensure clean state
             _demoRecorder.DemonstrationDirectory = _currentSessionFolder;
             _demoRecorder.DemonstrationName = $"Episode-{_episodesRecorded}";
             
-            Debug.Log($"[VR_Imitation] Recording to: {_demoRecorder.DemonstrationDirectory} / {_demoRecorder.DemonstrationName}");
+            Debug.Log($"[VR_Imitation] Enabling Recorder for {_demoRecorder.DemonstrationName}");
             _demoRecorder.enabled = true; 
             _demoRecorder.Record = true;
-            
-            _armAgent.EndEpisode(); // Trigger Start
-            yield return null;
 
             // Wait for Episode Completion
             bool episodeFinished = false;
@@ -244,9 +244,12 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
             }
             
             // --- STOP RECORDING & CLOSE FILE ---
+            // Note: The ArmAgent already called Close() internally inside FinishEpisode
+            // to prevent the "Next Episode Start" from leaking. 
+            // We call it here again to be safe and ensure the file handle is released.
             _demoRecorder.Record = false;
             _demoRecorder.enabled = false; 
-            _demoRecorder.Close(); // FORCE CLOSE to save file immediately
+            _demoRecorder.Close(); 
             
             _armAgent.OnEpisodeCompleted -= onFinish;
 

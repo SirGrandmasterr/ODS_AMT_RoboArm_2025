@@ -9238,7 +9238,7 @@ MonoBehaviour:
   _toggleDriveBinding: <XRController>/primaryButton
   _grabBinding: <XRController>/trigger
   _wristRotationOffset: 0
-  _episodesToRecord: 10
+  _episodesToRecord: 4
   _recordingStartPose: 2
 --- !u!4 &6528530117756741936
 Transform:

@@ -127,10 +127,6 @@ public class ArmAgent_IK_Recording : Agent
         // 1. Reset Robot State FIRST (Always needed for both alignment and task)
         ResetAndApplyJointRotations(); 
         
-        // --- SPAWNING CONTROL ---
-        // FIX: Check this flag BEFORE calling environment.ResetEnvironment().
-        // If we are merely aligning (preventSpawning = true), we do NOT want to move the bottle.
-        // It should stay in the bin/floor from the previous episode until the user is ready.
         if (preventSpawning) return; 
         
         // 2. Reset Environment Logic (Resets bottle position, lesson number, etc.)
@@ -213,10 +209,6 @@ public class ArmAgent_IK_Recording : Agent
 
     public override void OnActionReceived(ActionBuffers actions)
     {
-        // FIX: If preventSpawning is true, it means the episode finished and we are waiting 
-        // for the VR controller to align for the next one. We must stop logic here to prevent 
-        // the agent from acting on the previous state (bottle still in bin) which causes 
-        // rapid-fire success loops.
         if (preventSpawning) return;
 
         float dt = Time.fixedDeltaTime;
@@ -381,19 +373,20 @@ public class ArmAgent_IK_Recording : Agent
         Debug.Log($"<color={color}>[ArmAgent_IK_Recording] Episode Finished. Lesson: {lesson} | Result: {result} | Reward: {reward:F2} | Steps: {steps} | Reason: {reason}</color>");
         
         OnEpisodeCompleted?.Invoke(success, steps);
-        
-        // FIX: Do NOT stop the recorder here. The Controller manages the recording state.
-        // Stopping it here prevents the "Done" flag from being written to the demo file.
-        // var recorder = GetComponent<DemonstrationRecorder>();
-        // if (recorder) recorder.Record = false; 
 
-        // FIX: In VR Mode, prevent the bottle from respawning immediately upon success/fail.
-        // It should only respawn when the user aligns and starts the next episode.
         if (useExternalHeuristic)
         {
             preventSpawning = true;
         }
-
+        if (useExternalHeuristic)
+        {
+            var recorder = GetComponent<DemonstrationRecorder>();
+            if (recorder) 
+            {
+                recorder.Record = false; // Updates the Inspector UI
+                recorder.Close();        // IMMEDIATELY removes the writer from the Agent
+            }
+        }
         EndEpisode();
     }
 
