@@ -1,0 +1,68 @@
+{
+    "lesson_number": {
+        "lesson_num": 3
+    },
+    "RoboArm": {
+        "checkpoints": [
+            {
+                "steps": 3499982,
+                "file_path": "results\\FirstVisualTest\\RoboArm\\RoboArm-3499982.onnx",
+                "reward": 2.9764128061223314,
+                "creation_time": 1769104345.7299304,
+                "auxillary_file_paths": [
+                    "results\\FirstVisualTest\\RoboArm\\RoboArm-3499982.pt"
+                ]
+            },
+            {
+                "steps": 3999990,
+                "file_path": "results\\FirstVisualTest\\RoboArm\\RoboArm-3999990.onnx",
+                "reward": 3.1419454350456455,
+                "creation_time": 1769110590.0003228,
+                "auxillary_file_paths": [
+                    "results\\FirstVisualTest\\RoboArm\\RoboArm-3999990.pt"
+                ]
+            },
+            {
+                "steps": 4499999,
+                "file_path": "results\\FirstVisualTest\\RoboArm\\RoboArm-4499999.onnx",
+                "reward": 2.7850081428237585,
+                "creation_time": 1769116880.2013466,
+                "auxillary_file_paths": [
+                    "results\\FirstVisualTest\\RoboArm\\RoboArm-4499999.pt"
+                ]
+            },
+            {
+                "steps": 4690369,
+                "file_path": "results\\FirstVisualTest\\RoboArm\\RoboArm-4690369.onnx",
+                "reward": 3.3633567555238018,
+                "creation_time": 1769119276.6698167,
+                "auxillary_file_paths": [
+                    "results\\FirstVisualTest\\RoboArm\\RoboArm-4690369.pt"
+                ]
+            },
+            {
+                "steps": 4966232,
+                "file_path": "results\\FirstVisualTest\\RoboArm\\RoboArm-4966232.onnx",
+                "reward": -0.9601114072394648,
+                "creation_time": 1769129808.5574682,
+                "auxillary_file_paths": [
+                    "results\\FirstVisualTest\\RoboArm\\RoboArm-4966232.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 4966232,
+            "file_path": "results\\FirstVisualTest\\RoboArm.onnx",
+            "reward": -0.9601114072394648,
+            "creation_time": 1769129808.5574682,
+            "auxillary_file_paths": [
+                "results\\FirstVisualTest\\RoboArm\\RoboArm-4966232.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.1.0",
+        "torch_version": "2.2.2+cu121"
+    }
+}
