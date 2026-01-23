@@ -104,18 +104,6 @@ public class SortingEnvironment_Recording : MonoBehaviour
 
     private void SetupLesson_Place(Transform agentEndEffector = null)
     {
-        // Lesson 2: Place - Starts held by agent (or at agent pos). 
-        // Note: For pure separation, if we want the Agent to HOLD it, the Agent needs to do the "ForceGrab".
-        // Here we just position it. The Agent script calls ForceGrab if it detects this lesson, OR we provide a helper.
-        // For side-by-side, we'll position it at the spawn point for now, or we need the Agent's EE position.
-        // Implementation Choice: Agent will handle the "Attach" part, Env positions it.
-        // Actually, original code used: ResetBottlePhysics(endEffector.position, true);
-        // We will put it at a fixed spawn point if EE unknown, or let Agent handle it. 
-        // BETTER: Use spawn point for simplicity in this refactor, strictly checking bins.
-        // However, standard curriculum implies starting GRABBED.
-        // We will default to spawn point, but Agent should override if it wants to grab immediately.
-        
-        // Strategy: Reset to Spawn Point, but ensure bins are active.
         ResetBottlePhysics(bottleSpawnPoint.position, true);
         RandomizeBottleMaterialAndTarget();
         

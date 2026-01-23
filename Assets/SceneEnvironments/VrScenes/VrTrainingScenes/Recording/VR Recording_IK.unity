@@ -9238,7 +9238,6 @@ MonoBehaviour:
   _toggleDriveBinding: <XRController>/primaryButton
   _grabBinding: <XRController>/trigger
   _wristRotationOffset: 0
-  _demoNameBase: Sorting_Demo_User_IK
   _episodesToRecord: 10
   _recordingStartPose: 2
 --- !u!4 &6528530117756741936

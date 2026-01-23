@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections.Generic;
 using System;
+using System.IO;
 using Unity.MLAgents.Demonstrations;
 using Unity.MLAgents.Policies;
 
@@ -58,9 +59,10 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
     // Recording
     private DemonstrationRecorder _demoRecorder;
     private Coroutine _sessionCoroutine;
-    [SerializeField] private string _demoNameBase = "Sorting_Demo_User_IK";
     [SerializeField] private int _episodesToRecord = 10;
     [SerializeField] private InitializationConfig.StartPoseType _recordingStartPose = InitializationConfig.StartPoseType.SlightRandom;
+    
+    private string _currentSessionFolder; // Relative path for the current session's demos
 
     // Visuals
     private GameObject _activeTrackingBall;
@@ -145,7 +147,6 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
         }
         
         // 1. Ensure Agent is ready
-        // Set config on Agent if we assume it has one attached
         var config = _armAgent.GetComponent<InitializationConfig>();
         if (config) config.startPoseType = _recordingStartPose;
         
@@ -154,66 +155,85 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
         if (!env) env = FindFirstObjectByType<SortingEnvironment_Recording>();
         if (env) env.forceFullTaskMode = true;
 
-        // 2. Start Recording Coroutine
-        if (_sessionCoroutine != null) StopCoroutine(_sessionCoroutine);
-        _sessionCoroutine = StartCoroutine(DemonstrationSession());
+        // 2. Directory Setup
+        string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        string folderName = $"Sorting_Session_{timestamp}_ik";
+        string rootDemoFolder = "Demonstrations";
         
-        // NOTE: DemonstrationSession manages the episodes and calling StartEpisode()
-    }
+        // Ensure physical directory exists
+        // Application.dataPath is ".../Assets"
+        string fullPath = Path.Combine(Application.dataPath, rootDemoFolder, folderName);
+        if (!Directory.Exists(fullPath))
+        {
+            Directory.CreateDirectory(fullPath);
+            Debug.Log($"[VR_Imitation] Created Demo Directory: {fullPath}");
+        }
+        
+        // Use ABSOLUTE PATH for DemonstrationDirectory
+        _currentSessionFolder = fullPath;
+        Debug.Log($"[VR_Imitation] Session Folder Path: {_currentSessionFolder}");
 
-    private System.Collections.IEnumerator DemonstrationSession()
-    {
-        // Ensure Recorder exists
+        // 3. Setup Recorder Component
         _demoRecorder = _armAgent.GetComponent<DemonstrationRecorder>();
         if (_demoRecorder == null)
             _demoRecorder = _armAgent.gameObject.AddComponent<DemonstrationRecorder>();
         
-        _demoRecorder.NumStepsToRecord = 0; 
-        _demoRecorder.enabled = false; // Disable initially to prevent phantom recordings during alignment 
+        // Reset Recorder State
+        _demoRecorder.Record = false;
+        _demoRecorder.enabled = false; // Closed file state
 
+        // 4. Start Recording Coroutine
+        if (_sessionCoroutine != null) StopCoroutine(_sessionCoroutine);
+        _sessionCoroutine = StartCoroutine(DemonstrationSession());
+    }
+
+    private System.Collections.IEnumerator DemonstrationSession()
+    {
         while (_episodesRecorded < _episodesToRecord)
         {
-            // --- START NEW EPISODE ---
+            // --- ALIGNMENT PHASE (NOT RECORDED) ---
             Debug.Log($"[VR_Imitation] Starting Episode {_episodesRecorded + 1}");
-            _currentState = DriveState.WaitingForAlignment; // Need alignment for every new start if randomized!
+            _currentState = DriveState.WaitingForAlignment; 
 
             // Force Agent Reset (Randomizes Pose)
-            // Force Agent Reset (Randomizes Pose)
-            _armAgent.preventSpawning = true; // Prevent bottle from spawning on this initial reset
+            _armAgent.preventSpawning = true; 
             _armAgent.EndEpisode(); 
-            // Wait a frame for initialization to settle
             yield return null;
             
-            // Disable Agent Step while aligning to stop clock/steps
+            // Disable Agent Step while aligning
             _armAgent.enabled = false;
 
-            // Spawn Ghost at actual robot position
-            // Since we just reset, the robot is at a new random pose.
             SpawnGhostAtRobotEE();
 
             // Wait for User to Align
             while (_currentState == DriveState.WaitingForAlignment)
             {
-                // User can cancel via button, handled in Update()
-                 if (_sessionCoroutine == null) yield break; // Safety check
+                 if (_sessionCoroutine == null) yield break; 
                 yield return null;
             }
 
-            // --- DRIVE & RECORD ---
-            // If we are here, state became Driving (Engagement Success)
-            if (_currentState != DriveState.Driving) break; // Canceled?
+            // --- DRIVE & RECORD (ACTUAL EPISODE) ---
+            if (_currentState != DriveState.Driving) break; 
 
-            // Reset Agent for REAL start
+            
             _armAgent.enabled = true;
             _armAgent.preventSpawning = false; // Allow bottle spawn
+            
+            // Explicitly Close to reset internal writer state (LazyInitialize will be called next Update)
+            _demoRecorder.Close();
+
+            // Set Absolute Directory and Simple Name
+            _demoRecorder.DemonstrationDirectory = _currentSessionFolder;
+            _demoRecorder.DemonstrationName = $"Episode-{_episodesRecorded}";
+            
+            Debug.Log($"[VR_Imitation] Recording to: {_demoRecorder.DemonstrationDirectory} / {_demoRecorder.DemonstrationName}");
+            _demoRecorder.enabled = true; 
+            _demoRecorder.Record = true;
+            
             _armAgent.EndEpisode(); // Trigger Start
             yield return null;
 
-            _demoRecorder.DemonstrationName = $"{_demoNameBase}_{DateTime.Now:yyyyMMdd_HHmmss}_Ep{_episodesRecorded}";
-            _demoRecorder.enabled = true; // Enable just before recording
-            _demoRecorder.Record = true;
-
-            // Wait for Episode Completion (Success/Fail)
+            // Wait for Episode Completion
             bool episodeFinished = false;
             ArmAgent_IK_Recording.EpisodeCompleteHandler onFinish = (bool s, int c) => { episodeFinished = true; };
             _armAgent.OnEpisodeCompleted += onFinish;
@@ -223,19 +243,22 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
                 yield return null;
             }
             
-            _armAgent.OnEpisodeCompleted -= onFinish;
+            // --- STOP RECORDING & CLOSE FILE ---
             _demoRecorder.Record = false;
-            _demoRecorder.enabled = false; // Disable immediately after episode ends
+            _demoRecorder.enabled = false; 
+            _demoRecorder.Close(); // FORCE CLOSE to save file immediately
+            
+            _armAgent.OnEpisodeCompleted -= onFinish;
 
-            if (_currentState != DriveState.Driving) break; // Canceled mid-episode
+            if (_currentState != DriveState.Driving) break; 
 
-            _episodesRecorded++; // Use class field
+            _episodesRecorded++; 
             
             // Disengage Control for next reset
-            DisengageControl(); // Robot stops following hand, stays in last pose or resets
+            DisengageControl(); 
             yield return new WaitForSeconds(0.5f);
         }
-
+        
         StopDriveMode();
     }
     
@@ -243,13 +266,11 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
     {
         if (_activeGhost != null) Destroy(_activeGhost);
         
-        // Use the exposed EndEffector from the Agent
         Vector3 spawnPos = _armAgent.endEffector != null ? _armAgent.endEffector.position : _armAgent.transform.position;
 
         if (_ghostHandPrefab)
         {
              _activeGhost = Instantiate(_ghostHandPrefab, spawnPos, Quaternion.identity);
-             // Make sure it doesn't collide
              var col = _activeGhost.GetComponent<Collider>();
              if(col) Destroy(col);
         }
@@ -259,7 +280,7 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
              _activeGhost.transform.position = spawnPos;
              _activeGhost.transform.localScale = Vector3.one * 0.1f;
              var r = _activeGhost.GetComponent<Renderer>();
-             if(r) r.material.color = new Color(0, 1, 1, 0.5f); // Cyan transparent
+             if(r) r.material.color = new Color(0, 1, 1, 0.5f); 
              Destroy(_activeGhost.GetComponent<Collider>());
         }
     }
@@ -270,7 +291,6 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
 
         float dist = Vector3.Distance(_rightHandController.position, _activeGhost.transform.position);
         
-        // Feedback? Turn Ghost Green?
         var r = _activeGhost.GetComponent<Renderer>();
         if (r) r.material.color = (dist < _engagementDistance) ? Color.green : Color.cyan;
 
@@ -287,18 +307,15 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
         
         if (_activeGhost) Destroy(_activeGhost);
 
-        // Visual
         if (_trackingBallPrefab && _activeTrackingBall == null)
         {
             _activeTrackingBall = Instantiate(_trackingBallPrefab);
              if(_activeTrackingBall.GetComponent<Collider>()) Destroy(_activeTrackingBall.GetComponent<Collider>());
         }
 
-        // Enable Agent
         _armAgent.SetExternalControl(true);
         _armAgent.SetIKController(_robotArmController);
         
-        // Force Heuristic Mode
         var behaviorParams = _armAgent.GetComponent<BehaviorParameters>();
         if (behaviorParams) behaviorParams.BehaviorType = BehaviorType.HeuristicOnly;
     }
@@ -306,16 +323,7 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
     private void DisengageControl()
     {
         _armAgent.SetExternalControl(false);
-        
-        // Stop Visuals
         if (_activeTrackingBall) Destroy(_activeTrackingBall);
-    }
-
-    private void HandleEpisodeCompleted(bool success, int steps)
-    {
-        float time = steps * Time.fixedDeltaTime;
-        string result = success ? "<color=green>SUCCESS</color>" : "<color=red>FAIL</color>";
-        Debug.Log($"<b>[VR RECORDER]</b> Episode {_episodesRecorded + 1}: {result} | Steps: {steps} | Time: {time:F2}s");
     }
 
     private void StopDriveMode()
@@ -325,7 +333,6 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
         if (_armAgent != null)
         {
              _armAgent.SetExternalControl(false);
-             // _armAgent.OnEpisodeCompleted -= HandleEpisodeCompleted; // It is locally subscribed in coroutine
         }
 
         _currentState = DriveState.Idle;
@@ -375,12 +382,11 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
         Vector3 targetPos = _rightHandController.position;
         float wristAngle = _rightHandController.localEulerAngles.z + _wristRotationOffset;
         
-        // Pass to Agent to Calculate Delta
         _armAgent.SetExternalTarget(targetPos, wristAngle);
 
         if (_activeTrackingBall) _activeTrackingBall.transform.position = targetPos;
         
-        _armAgent.RequestDecision(); // Force Agent Step
+        _armAgent.RequestDecision(); 
     }
 
     private void HandleGrabInput()
@@ -390,7 +396,7 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
         float grabValue = _grabAction.ReadValue<float>();
         bool isPressing = grabValue > 0.5f;
 
-        if (isPressing && !_isGrabbing)
+        if (isPressing && !_isGrabbing) 
         {
             _isGrabbing = true;
             _armAgent.externalClawSignal = true; 

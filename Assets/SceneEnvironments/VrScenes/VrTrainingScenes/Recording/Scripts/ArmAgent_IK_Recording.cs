@@ -124,7 +124,16 @@ public class ArmAgent_IK_Recording : Agent
 
         _currentStepCount = 0;
 
-        // 1. Reset Environment Logic
+        // 1. Reset Robot State FIRST (Always needed for both alignment and task)
+        ResetAndApplyJointRotations(); 
+        
+        // --- SPAWNING CONTROL ---
+        // FIX: Check this flag BEFORE calling environment.ResetEnvironment().
+        // If we are merely aligning (preventSpawning = true), we do NOT want to move the bottle.
+        // It should stay in the bin/floor from the previous episode until the user is ready.
+        if (preventSpawning) return; 
+        
+        // 2. Reset Environment Logic (Resets bottle position, lesson number, etc.)
         environment.ResetEnvironment();
 
         // Adjust MaxStep based on lesson
@@ -137,13 +146,6 @@ public class ArmAgent_IK_Recording : Agent
             MaxStep = defaultMaxStep;
         }
 
-        // 2. Reset Robot State (via Forward Kinematics first, then IK Sync)
-        // 2. Reset Robot State (via Forward Kinematics first, then IK Sync)
-        ResetAndApplyJointRotations(); // This resets arm joints
-        
-        // --- SPAWNING CONTROL ---
-        if (preventSpawning) return; // Skip bottle spawning logic
-        
         // Reset Claw State based on Lesson
         if (environment.CurrentLessonNumber == 2f) 
         {
@@ -211,6 +213,12 @@ public class ArmAgent_IK_Recording : Agent
 
     public override void OnActionReceived(ActionBuffers actions)
     {
+        // FIX: If preventSpawning is true, it means the episode finished and we are waiting 
+        // for the VR controller to align for the next one. We must stop logic here to prevent 
+        // the agent from acting on the previous state (bottle still in bin) which causes 
+        // rapid-fire success loops.
+        if (preventSpawning) return;
+
         float dt = Time.fixedDeltaTime;
 
         // --- 1. MOVEMENT (IK Target) ---
@@ -374,11 +382,16 @@ public class ArmAgent_IK_Recording : Agent
         
         OnEpisodeCompleted?.Invoke(success, steps);
         
-        // Stop Recorder explicitly to avoid recording the next "Reset" episode
-        var recorder = GetComponent<DemonstrationRecorder>();
-        if (recorder)
+        // FIX: Do NOT stop the recorder here. The Controller manages the recording state.
+        // Stopping it here prevents the "Done" flag from being written to the demo file.
+        // var recorder = GetComponent<DemonstrationRecorder>();
+        // if (recorder) recorder.Record = false; 
+
+        // FIX: In VR Mode, prevent the bottle from respawning immediately upon success/fail.
+        // It should only respawn when the user aligns and starts the next episode.
+        if (useExternalHeuristic)
         {
-            recorder.Record = false;
+            preventSpawning = true;
         }
 
         EndEpisode();
