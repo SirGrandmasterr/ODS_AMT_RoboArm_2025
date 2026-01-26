@@ -37,32 +37,32 @@ behaviors:
 environment_parameters:
   lesson_number:
     curriculum:
-      - name: Lesson1_Reach
-        completion_criteria:
-          measure: reward
-          behavior: RoboArmIK
-          threshold: 3.5
-          min_lesson_length: 100
-          signal_smoothing: true
-        value: 0.0
+      #- name: Lesson1_Reach
+      #  completion_criteria:
+      #    measure: reward
+      #    behavior: RoboArmIK
+      #    threshold: 3.5
+      #    min_lesson_length: 100
+      #    signal_smoothing: true
+      #  value: 0.0
 
-      - name: Lesson2_Grab
-        completion_criteria:
-          measure: progress
-          behavior: RoboArmIK
-          threshold: 0.01
-          min_lesson_length: 100
-          signal_smoothing: true
-        value: 1.0
+      #- name: Lesson2_Grab
+      #  completion_criteria:
+      #    measure: progress
+      #    behavior: RoboArmIK
+      #    threshold: 0.01
+      #    min_lesson_length: 100
+      #    signal_smoothing: true
+      #  value: 1.0
 
-      - name: Lesson3_Place
-        completion_criteria:
-          measure: reward
-          behavior: RoboArmIK
-          threshold: 5.5 # High threshold to ensure precision placement
-          min_lesson_length: 100
-          signal_smoothing: true
-        value: 2.0
+      #- name: Lesson3_Place
+      #  completion_criteria:
+      #    measure: reward
+      #    behavior: RoboArmIK
+      #    threshold: 5.5 # High threshold to ensure precision placement
+      #    min_lesson_length: 100
+      #    signal_smoothing: true
+      #  value: 2.0
 
       - name: Lesson4_FullTask
         completion_criteria:
