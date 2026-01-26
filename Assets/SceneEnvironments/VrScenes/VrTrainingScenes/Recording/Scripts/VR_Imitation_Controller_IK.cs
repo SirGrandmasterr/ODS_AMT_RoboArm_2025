@@ -161,7 +161,6 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
         string rootDemoFolder = "Demonstrations";
         
         // Ensure physical directory exists
-        // Application.dataPath is ".../Assets"
         string fullPath = Path.Combine(Application.dataPath, rootDemoFolder, folderName);
         if (!Directory.Exists(fullPath))
         {
@@ -220,14 +219,13 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
             _armAgent.preventSpawning = false; // Allow bottle spawn
             
             // 1. Manually Reset Environment/State
-            // calling EndEpisode() here raises a "Done" flag which creates a ghost episode.
-            // So we manually call OnEpisodeBegin to reset logic without triggering the ML-Agents EndEpisode cycle.
             _armAgent.OnEpisodeBegin(); 
             
             // 2. NOW Enable Recorder
-            _demoRecorder.Close(); // Ensure clean state
+            // Crucial: Set properties while closed/disabled, then enable.
+            _demoRecorder.Close(); 
             _demoRecorder.DemonstrationDirectory = _currentSessionFolder;
-            _demoRecorder.DemonstrationName = $"Episode-{_episodesRecorded}";
+            _demoRecorder.DemonstrationName = $"Episode-{_episodesRecorded}"; // Unique Name
             
             Debug.Log($"[VR_Imitation] Enabling Recorder for {_demoRecorder.DemonstrationName}");
             _demoRecorder.enabled = true; 
@@ -243,17 +241,19 @@ public class VR_Imitation_Controller_IK : MonoBehaviour
                 yield return null;
             }
             
-            // --- STOP RECORDING & CLOSE FILE ---
-            // Note: The ArmAgent already called Close() internally inside FinishEpisode
-            // to prevent the "Next Episode Start" from leaking. 
-            // We call it here again to be safe and ensure the file handle is released.
-            _demoRecorder.Record = false;
-            _demoRecorder.enabled = false; 
-            _demoRecorder.Close(); 
-            
+            // Remove listener
             _armAgent.OnEpisodeCompleted -= onFinish;
 
             if (_currentState != DriveState.Driving) break; 
+
+            // --- STOP RECORDING & CLOSE FILE ---
+            // IMPORTANT: We wait one frame after episodeFinished to ensure Agent.EndEpisode() 
+            // has fully processed and sent the final reward/done flag to the recorder.
+            yield return null; 
+
+            _demoRecorder.Record = false;
+            _demoRecorder.enabled = false; 
+            _demoRecorder.Close(); // Flushes file to disk
 
             _episodesRecorded++; 
             

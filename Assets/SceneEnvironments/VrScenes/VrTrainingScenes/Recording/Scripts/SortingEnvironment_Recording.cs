@@ -27,7 +27,7 @@ public class SortingEnvironment_Recording : MonoBehaviour
     public Material aluminumMaterial;
 
     [Header("Debug / Recording")]
-    public bool forceFullTaskMode = false;
+    public bool forceFullTaskMode = true;
     
     [Header("Audio")]
     public AudioClip successSound;
@@ -83,7 +83,8 @@ public class SortingEnvironment_Recording : MonoBehaviour
     {
         // Lesson 0: Reach - Bottle spawns in random spot, bins disabled. 
         // Goal: Just get close to the bottle.
-        ResetBottlePhysics(GetRandomSpawnPos(randomizationArea.bounds, 0.1f), true);
+        Bounds smallerBounds = new Bounds(bottleSpawnPoint.position, randomizationArea.bounds.size * 0.5f);
+        ResetBottlePhysics(GetRandomSpawnPos(smallerBounds, 0.1f), false);
         SetBottleMaterial(BottleTargetSorting_Curriculum.MaterialType.Plastic);
         
         if(targetBinAluminum) targetBinAluminum.gameObject.SetActive(false);

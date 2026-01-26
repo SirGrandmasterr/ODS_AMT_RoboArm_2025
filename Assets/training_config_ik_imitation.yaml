@@ -12,21 +12,24 @@ behaviors:
       learning_rate_schedule: linear
     network_settings:
       normalize: true
-      hidden_units: 512
-      num_layers: 3
+      hidden_units: 256
+      num_layers: 2
       vis_encode_type: simple
     reward_signals:
       extrinsic:
         gamma: 0.99
         strength: 1.0
       gail:
-        gamma: 0.99
-        strength: 0.5
-        demo_path: ../../Demonstrations/SortingDemoUserI.demo # Ensure this matches where files are saved
-    behavioral_cloning:
-      strength: 0.5
-      steps: 500000 # Decay BC over first 500k steps
-      demo_path: ../../Demonstrations/SortingDemoUserI.demo  #C:\Users\vogle\Gitstuff\uni\ODS_AMT_RoboArm_2025\Assets\Demonstrations\SortingDemoUserI.demo
+        gamma: 0.9
+        strength: 0.1
+        demo_path: ../../Demonstrations/Sorting_Session_20260126_163919_ik # Ensure this matches where files are saved
+        use_vail: true
+        use_actions: true
+        
+    #behavioral_cloning:
+    #  strength: 0.5
+    #  steps: 50000 # Decay BC over first 500k steps
+    #  demo_path: ../../Demonstrations/Sorting_Session_20260126_163919_ik  #C:\Users\vogle\Gitstuff\uni\ODS_AMT_RoboArm_2025\Assets\Demonstrations\SortingDemoUserI.demo
     max_steps: 5000000
     time_horizon: 64 
     summary_freq: 10000
@@ -34,32 +37,32 @@ behaviors:
 environment_parameters:
   lesson_number:
     curriculum:
-      #- name: Lesson1_Reach
-      #  completion_criteria:
-      #    measure: reward
-      #    behavior: RoboArmIK
-      #    threshold: 3.5
-      #    min_lesson_length: 100
-      #    signal_smoothing: true
-      #  value: 0.0
+      - name: Lesson1_Reach
+        completion_criteria:
+          measure: reward
+          behavior: RoboArmIK
+          threshold: 3.5
+          min_lesson_length: 100
+          signal_smoothing: true
+        value: 0.0
 
-      #- name: Lesson2_Grab
-      #  completion_criteria:
-      #    measure: progress
-      #    behavior: RoboArmIK
-      #    threshold: 0.01
-      #    min_lesson_length: 100
-      #    signal_smoothing: true
-      #  value: 1.0
+      - name: Lesson2_Grab
+        completion_criteria:
+          measure: progress
+          behavior: RoboArmIK
+          threshold: 0.01
+          min_lesson_length: 100
+          signal_smoothing: true
+        value: 1.0
 
-      #- name: Lesson3_Place
-      #  completion_criteria:
-      #    measure: reward
-      #    behavior: RoboArmIK
-      #    threshold: 5.5 # High threshold to ensure precision placement
-      #    min_lesson_length: 100
-      #    signal_smoothing: true
-      #  value: 2.0
+      - name: Lesson3_Place
+        completion_criteria:
+          measure: reward
+          behavior: RoboArmIK
+          threshold: 5.5 # High threshold to ensure precision placement
+          min_lesson_length: 100
+          signal_smoothing: true
+        value: 2.0
 
       - name: Lesson4_FullTask
         completion_criteria:

@@ -378,16 +378,22 @@ public class ArmAgent_IK_Recording : Agent
         {
             preventSpawning = true;
         }
+
+        EndEpisode();
+
+        // --- FIX FOR "2 EPISODES PER FILE" BUG ---
+        // We must stop recording IMMEDIATELY after EndEpisode finishes.
+        // EndEpisode sends the "Done" flag (good), but also starts the next episode.
+        // If we don't set Record=false here, the Recorder captures the start of the next episode
+        // before the VR Controller wakes up to close the file.
         if (useExternalHeuristic)
         {
             var recorder = GetComponent<DemonstrationRecorder>();
-            if (recorder) 
+            if (recorder != null)
             {
-                recorder.Record = false; // Updates the Inspector UI
-                recorder.Close();        // IMMEDIATELY removes the writer from the Agent
+                recorder.Record = false;
             }
         }
-        EndEpisode();
     }
 
     // --- Helpers ---

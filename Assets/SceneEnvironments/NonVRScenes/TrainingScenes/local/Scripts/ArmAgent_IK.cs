@@ -53,6 +53,9 @@ public class ArmAgent_IK : Agent
     
     private int defaultMaxStep;
 
+    // Execution Safety
+    private bool m_IsEpisodeFinished = false;
+
     public override void Initialize()
     {
         // 1. Check Environment
@@ -81,7 +84,7 @@ public class ArmAgent_IK : Agent
         }
         
         // Safety
-        if (MaxStep == 0) MaxStep = 5000;
+        if (MaxStep == 0) MaxStep = 500;
         defaultMaxStep = MaxStep;
         
         // Init state
@@ -91,6 +94,9 @@ public class ArmAgent_IK : Agent
 
     public override void OnEpisodeBegin()
     {
+        // RESET SAFETY FLAG
+        m_IsEpisodeFinished = false;
+
         if (environment == null) return;
 
         // 1. Reset Environment Logic
@@ -101,7 +107,7 @@ public class ArmAgent_IK : Agent
         // or just less steps allowed as per request.
         if (environment.CurrentLessonNumber == 0f)
         {
-            MaxStep = 5000;
+            MaxStep = 500;
         }
         else
         {
@@ -144,6 +150,8 @@ public class ArmAgent_IK : Agent
         // 4. Initialize Rewards
         previousDistanceToBottle = Vector3.Distance(currentTargetPosition, environment.bottle.position);
         previousDistanceToBin = environment.GetHorizontalDistanceToBin(environment.bottle.position);
+
+        Debug.Log($"[ArmAgent_IK] Episode Start. Reward: {GetCumulativeReward():F2}");
     }
 
     public override void CollectObservations(VectorSensor sensor)
@@ -179,6 +187,9 @@ public class ArmAgent_IK : Agent
 
     public override void OnActionReceived(ActionBuffers actions)
     {
+        // SAFETY: Do not process actions if we already failed in Physics/Collision this frame
+        if (m_IsEpisodeFinished) return;
+
         float dt = Time.fixedDeltaTime;
 
         // --- 1. MOVEMENT (IK Target) ---
@@ -209,6 +220,13 @@ public class ArmAgent_IK : Agent
 
         // --- 2. CLAW LOGIC ---
         float clawInput = actions.ContinuousActions[4];
+
+        // Warmup for Lesson 2 (Place) to prevent immediate drop
+        if (environment.CurrentLessonNumber == 2f && StepCount < 10)
+        {
+            clawInput = 1.0f; // Force Close
+        }
+
         bool wasHolding = IsHoldingObject();
 
         if (clawInput > 0.0f) // Close
@@ -311,26 +329,38 @@ public class ArmAgent_IK : Agent
         }
     }
 
+    // DEBUGGING: I have commented this out.
+    // Use the Compiler Error in Unity to find which script is trying to call this!
+    /*
     public void OnPartCollision(string hitTag)
     {
+        // SAFETY: Guard against multiple collisions per frame
+        if (m_IsEpisodeFinished) return;
+
         if (hitTag == "Conveyor" || hitTag == "RobotPart" || hitTag == "Ground")
         {  
             Debug.Log($"<color=red>[ArmAgent_IK] Collision ({hitTag}).</color>");
             AddReward(-1.0f); 
-            Debug.Log($"<color=red>[ArmAgent_IK] Collision ({hitTag}).</color>");
-            AddReward(-1.0f); 
+            // Removed duplicate penalty here
             FinishEpisode(false, $"Collision with {hitTag}");
         }
     }
+    */
 
     public void OnBottleHitGround()
     {
+        if (m_IsEpisodeFinished) return;
+
         AddReward(-1.0f);
         FinishEpisode(false, "Failure: Bottle Hit Ground");
     }
 
     private void FinishEpisode(bool success, string reason = "")
     {
+        // FINAL GUARD: Ensure we only finish once per episode
+        if (m_IsEpisodeFinished) return;
+        m_IsEpisodeFinished = true;
+
         float reward = GetCumulativeReward();
         int steps = StepCount;
         float lesson = environment != null ? environment.CurrentLessonNumber : 0f;

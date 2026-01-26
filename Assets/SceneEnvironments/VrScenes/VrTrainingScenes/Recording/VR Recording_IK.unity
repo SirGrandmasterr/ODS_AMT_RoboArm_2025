@@ -4870,6 +4870,10 @@ PrefabInstance:
       propertyPath: m_Mesh
       value: 
       objectReference: {fileID: 1948471645}
+    - target: {fileID: 6507094536553280552, guid: c4a32a5f56e2e514286efc4eba87ac9a, type: 3}
+      propertyPath: forceFullTaskMode
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 7203235677272368859, guid: c4a32a5f56e2e514286efc4eba87ac9a, type: 3}
       propertyPath: m_Mesh
       value: 
@@ -9238,7 +9242,7 @@ MonoBehaviour:
   _toggleDriveBinding: <XRController>/primaryButton
   _grabBinding: <XRController>/trigger
   _wristRotationOffset: 0
-  _episodesToRecord: 4
+  _episodesToRecord: 100
   _recordingStartPose: 2
 --- !u!4 &6528530117756741936
 Transform:
