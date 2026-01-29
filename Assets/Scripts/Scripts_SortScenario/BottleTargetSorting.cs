@@ -8,7 +8,7 @@ using UnityEngine;
 public class BottleTargetSorting_Curriculum : MonoBehaviour
 {
     public enum MaterialType { Plastic, Aluminum }
-    
+
     [Header("Bottle State")]
     public MaterialType material;
     public bool isHeld = false;
@@ -45,7 +45,7 @@ public class BottleTargetSorting_Curriculum : MonoBehaviour
         // Only fail if we hit ground and are NOT in a bin zone
         if (collision.gameObject.layer == 0 && agent != null && !isInBinZone)
         {
-             agent.OnBottleDropped();
+            agent.OnBottleDropped();
         }
     }
 
@@ -56,7 +56,7 @@ public class BottleTargetSorting_Curriculum : MonoBehaviour
             isOverAluminumBin = true;
             Debug.Log("<color=magenta>[Bottle] Entered ALUMINUM Bin Zone</color>");
         }
-        if (other.CompareTag("TargetBinPlastic")) 
+        if (other.CompareTag("TargetBinPlastic"))
         {
             isOverPlasticBin = true;
             Debug.Log("<color=magenta>[Bottle] Entered PLASTIC Bin Zone</color>");
@@ -69,7 +69,7 @@ public class BottleTargetSorting_Curriculum : MonoBehaviour
         if (other.CompareTag("TargetBinAluminum")) isOverAluminumBin = true;
         if (other.CompareTag("TargetBinPlastic")) isOverPlasticBin = true;
     }
-    
+
     private void OnTriggerExit(Collider other)
     {
         if (other.CompareTag("TargetBinAluminum"))
