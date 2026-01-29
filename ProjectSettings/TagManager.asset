@@ -8,6 +8,8 @@ TagManager:
   - TargetLocation
   - TargetBinPlastic
   - TargetBinAluminum
+  - Ground
+  - Conveyor
   layers:
   - Default
   - TransparentFX

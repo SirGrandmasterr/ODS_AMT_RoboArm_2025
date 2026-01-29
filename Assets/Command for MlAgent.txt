@@ -1,0 +1,1 @@
+poetry run mlagents-learn ../../trainingConfigServer.yaml --env=~/Schreibtisch/AgentTrainerServer/AgentTrainer.x86_64 --run-id=RoboArm_Servered --num-envs=20 --no-graphics

@@ -42,11 +42,13 @@ public class EnvironmentSpawner : MonoBehaviour
             // Calculate the world position for the new environment
             Vector3 position = new Vector3(x * spacing, y, z * spacing);
 
-            // Instantiate the new environment
-            GameObject newEnv = Instantiate(trainingEnvPrefab, position, Quaternion.identity);
+            // Instantiate the new environment preserving prefab's rotation
+            GameObject newEnv = Instantiate(trainingEnvPrefab, position, trainingEnvPrefab.transform.rotation);
             
             // Optional: Name it for easier debugging in the Hierarchy
             newEnv.name = $"TrainingEnvironment_{i}";
+            
+            Debug.Log($"Spawned Environment {i} at {position} with Rotation {newEnv.transform.rotation.eulerAngles}");
         }
     }
 }

@@ -222,8 +222,15 @@ namespace Unity.MLAgents
         UnityInputProto Initialize(int port, UnityOutputProto unityOutput, out UnityInputProto unityInput)
         {
             string targetHost = System.Environment.GetEnvironmentVariable("MLAGENTS_HOST") ?? "localhost";
+            string targetPortStr = System.Environment.GetEnvironmentVariable("MLAGENTS_PORT");
+            int targetPort = port;
+            if (!string.IsNullOrEmpty(targetPortStr) && int.TryParse(targetPortStr, out int parsedPort))
+            {
+                targetPort = parsedPort;
+            }
+
             m_IsOpen = true;
-            m_Channel = new Channel($"{targetHost}:{port}", ChannelCredentials.Insecure);
+            m_Channel = new Channel($"{targetHost}:{targetPort}", ChannelCredentials.Insecure);
 
             m_Client = new UnityToExternalProto.UnityToExternalProtoClient(m_Channel);
             var result = m_Client.Exchange(WrapMessage(unityOutput, 200));

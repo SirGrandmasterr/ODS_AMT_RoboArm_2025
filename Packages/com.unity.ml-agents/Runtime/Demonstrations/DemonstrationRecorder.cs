@@ -120,6 +120,7 @@ namespace Unity.MLAgents.Demonstrations
 
             DemonstrationName = SanitizeName(DemonstrationName, MaxNameLength);
             var filePath = MakeDemonstrationFilePath(m_FileSystem, DemonstrationDirectory, DemonstrationName);
+            Debug.Log($"[DemoRecorder] Creating new Demo Writer at: {filePath}"); // ADDED LOG
             var stream = m_FileSystem.File.Create(filePath);
             m_DemoWriter = new DemonstrationWriter(stream);
 
@@ -184,6 +185,7 @@ namespace Unity.MLAgents.Demonstrations
         {
             if (m_DemoWriter != null)
             {
+                Debug.Log($"[DemoRecorder] Closing Demo Writer."); // ADDED LOG
                 RemoveDemonstrationWriterFromAgent(m_DemoWriter);
 
                 m_DemoWriter.Close();

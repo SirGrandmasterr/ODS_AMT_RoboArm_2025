@@ -1,27 +1,14 @@
 /*
- * MODIFIED AGENT SCRIPT (v2 - Curriculum)
- * ArmAgent_FK_Sorting.cs
- *
- * Major Changes:
- * 1.  Implemented Curriculum Learning with 4 lessons.
- * 2.  Fixed Reward Shaping: Changed from "progress-based" to "potential-based"
- * to prevent the "collapsing" behavior.
- * 3.  Fixed Grabbing: Changed from FixedJoint to Kinematic Parenting for stability.
- * 4.  Changed Claw Action: Converted from Discrete (0, 1, 2) to Continuous (1 float)
- * to make grabbing easier to learn.
- * 5.  Added new SerializedFields for curriculum (randomizationArea, bottleOriginalParent).
- * 6.  Added lesson_number to observations.
- *
- * --- DEVELOPER NOTE (v3) ---
- * 7.  Randomized joint rotations on episode start (in ResetJointRotations)
- * to prevent reward farming from a static start pose in Lesson 3.
+ * OPTIMIZED AGENT SCRIPT (v4.7 - Added Demo Configuration Helper)
+ * ArmAgentSorting_Curriculum.cs
 */
 
+using System;
 using UnityEngine;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
-using Unity.MLAgents.Integrations; // Required for Academy
+using Random = UnityEngine.Random;
 
 public class ArmAgentSorting_Curriculum : Agent
 {
@@ -46,193 +33,262 @@ public class ArmAgentSorting_Curriculum : Agent
     [Header("Environment - Sorting Scenario")]
     [SerializeField] private Transform bottle;
     [SerializeField] private Rigidbody bottleRb;
-    [SerializeField] private MeshRenderer bottleMeshRenderer; // To change bottle color
-    [Tooltip("The fixed spawn point for the bottle (e.g., end of conveyor).")]
+    [SerializeField] private MeshRenderer bottleMeshRenderer; 
     [SerializeField] private Transform bottleSpawnPoint;
-    [Tooltip("The target bin for Aluminum bottles. MUST have 'TargetBinAluminum' tag.")]
     [SerializeField] private Transform targetBinAluminum;
-    [Tooltip("The target bin for Plastic bottles. MUST have 'TargetBinPlastic' tag.")]
     [SerializeField] private Transform targetBinPlastic;
 
     [Header("Curriculum Learning Setup")]
-    [Tooltip("The area to randomize the bottle position in Lesson 1 & 2.")]
     [SerializeField] private BoxCollider randomizationArea;
-    [Tooltip("The bottle's original parent (e.g., the TrainingEnvironment) for proper reparenting.")]
     [SerializeField] private Transform bottleOriginalParent;
 
-
-    [Header("Visuals (Optional)")]
+    [Header("Visuals")]
     [SerializeField] private Material plasticMaterial;
     [SerializeField] private Material aluminumMaterial;
 
     [Header("Grabbing Logic")]
     [SerializeField] private float grabRadius = 0.1f;
     [SerializeField] private Rigidbody endEffectorRb;
+    
+    [Header("Demo Settings")]
+    public bool isDemoMode = false; // Check this in the Inspector for the Demo Scene
+    public bool isBrainActive = false; // The DemoManager will toggle this
+    public event Action OnJobFinished;
+    public event Action OnEpisodeEnded; // New Event for reliable tracking
 
+    [Header("IK Integration")]
+    [SerializeField] private RobotArm_IK_Controller ikController; 
+    public bool useIKHeuristic = false;
+    
+    // --- DEPENDENCY INJECTION ---
+    public void SetIKController(RobotArm_IK_Controller controller)
+    {
+        ikController = controller;
+    }
+    
     // --- Private State ---
     private BottleTargetSorting_Curriculum bottleScript;
-    private Vector3 initialBottlePos;
     private Quaternion initialBottleRot;
 
-    // Store the initial rotations as the "home" pose
-    private Quaternion initialBaseRot;
-    private Quaternion initialFirstSegRot;
-    private Quaternion initialSmallSegRot;
-    private Quaternion initialDrillRot;
-
-    // Current target rotations (driven by agent)
+    // Joint Control
     private float currentBaseYRotation;
     private float currentFirstSegmentYRotation;
     private float currentSmallSegmentYRotation;
     private float currentSmallSegmentDrillYRotation;
-    private float claw1XRotation; // Target for claw 1
-    private float claw2XRotation; // Target for claw 2
+    private float claw1XRotation; 
+    private float claw2XRotation; 
     
-    // Grabbing physics
-    private Rigidbody heldObjectRb; // This is our new 'isHolding' check
+    // Grabbing
+    private Rigidbody heldObjectRb; 
 
-    // Reward shaping
-    private Transform currentCorrectTargetBin; // The bin we *should* be going to
-
-    // Curriculum
+    // Optimization: Delta Reward Tracking
+    private float previousDistanceToBottle;
+    private float previousDistanceToBin;
+    private Transform currentCorrectTargetBin; 
     private float lesson_number;
+
+    // --- DEBUG / MANUAL MODE STATE ---
+    private bool manualDebugMode = false;
+
+    public void SetManualDebugMode(bool active)
+    {
+        manualDebugMode = active;
+        Debug.Log($"<color=cyan><b>[Agent]</b> Manual Debug Mode set to: {active}</color>");
+        EndEpisode(); // Trigger OnEpisodeBegin to apply changes
+    }
+    
+    // --- NEW: Helper to configure bottle type from DemoManager ---
+    public void ForceConfigureBottle(GameObject bottleObj, BottleTargetSorting_Curriculum.MaterialType matType)
+    {
+        if (bottleObj == null) return;
+
+        var script = bottleObj.GetComponent<BottleTargetSorting_Curriculum>();
+        var rend = bottleObj.GetComponent<MeshRenderer>();
+
+        // 1. Set Logic Type
+        if (script != null) script.material = matType;
+
+        // 2. Set Visual Material
+        if (rend != null)
+        {
+            if (matType == BottleTargetSorting_Curriculum.MaterialType.Plastic && plasticMaterial != null)
+            {
+                rend.material = plasticMaterial;
+            }
+            else if (matType == BottleTargetSorting_Curriculum.MaterialType.Aluminum && aluminumMaterial != null)
+            {
+                rend.material = aluminumMaterial;
+            }
+        }
+    }
+
+    public void SetDemoBottle(GameObject newBottle)
+    {
+        if (newBottle == null) return;
+        
+        // 1. Update Transforms
+        bottle = newBottle.transform;
+        bottleRb = newBottle.GetComponent<Rigidbody>();
+        bottleScript = newBottle.GetComponent<BottleTargetSorting_Curriculum>();
+        
+        // 2. CRITICAL FIX: Determine the Target Bin based on Material
+        // The Agent needs this to calculate rewards and check for success
+        if (bottleScript != null)
+        {
+            if (bottleScript.material == BottleTargetSorting_Curriculum.MaterialType.Plastic)
+            {
+                currentCorrectTargetBin = targetBinPlastic;
+                // Update renderer if needed for visuals, though likely already set on the prefab
+                if (bottleMeshRenderer && plasticMaterial) bottleMeshRenderer.material = plasticMaterial;
+            }
+            else
+            {
+                currentCorrectTargetBin = targetBinAluminum;
+                if (bottleMeshRenderer && aluminumMaterial) bottleMeshRenderer.material = aluminumMaterial;
+            }
+        }
+        else
+        {
+            Debug.LogError("[Agent] The Demo Bottle is missing the 'BottleTargetSorting_Curriculum' script!");
+        }
+
+        Debug.Log($"[Agent] Demo Bottle Updated. Target Bin set to: {(currentCorrectTargetBin != null ? currentCorrectTargetBin.name : "NULL")}");
+    }
+
 
     public override void Initialize()
     {
-        bottleScript = bottle.GetComponent<BottleTargetSorting_Curriculum>();
+        if (bottle) bottleScript = bottle.GetComponent<BottleTargetSorting_Curriculum>();
         
         if (endEffector != null)
         {
             if (endEffectorRb == null) endEffectorRb = endEffector.GetComponent<Rigidbody>();
             if (endEffectorRb == null)
             {
-                Debug.LogWarning("ArmAgent_FK: No Rigidbody found on EndEffector. Adding one.");
                 endEffectorRb = endEffector.gameObject.AddComponent<Rigidbody>();
             }
             endEffectorRb.isKinematic = true; 
         }
-        else
-        {
-            Debug.LogError("End Effector is not assigned! Grabbing will not work.");
-        }
 
-        // Store initial "home" pose
-        if (armbase) initialBaseRot = armbase.localRotation;
-        if (firstSegment) initialFirstSegRot = firstSegment.localRotation;
-        if (smallSegment) initialSmallSegRot = smallSegment.localRotation;
-        if (smallSegmentDrill) initialDrillRot = smallSegmentDrill.localRotation;
-        
-        if (bottle)
-        {
-            initialBottlePos = bottle.position;
-            initialBottleRot = bottle.rotation;
-        }
+        if (bottle) initialBottleRot = bottle.rotation;
+        if (bottleRb) bottleRb.sleepThreshold = 0.0f;
+    }
 
-        if (bottleSpawnPoint == null || targetBinAluminum == null || targetBinPlastic == null)
-        {
-            Debug.LogError("Environment targets (Spawn Point, Bin A, Bin B) are not set!", this);
-        }
-
-        if (bottleOriginalParent == null)
-        {
-            Debug.LogError("Bottle Original Parent is not set! Release logic will fail.", this);
-        }
+    // --- Helper for Horizontal Distance ---
+    private float GetHorizontalDistance(Vector3 p1, Vector3 p2)
+    {
+        return Vector2.Distance(new Vector2(p1.x, p1.z), new Vector2(p2.x, p2.z));
     }
 
     public override void OnEpisodeBegin()
     {
-        // Get current curriculum lesson
+        if (isDemoMode)
+        {
+            lesson_number = 3.0f; 
+            return;
+        }
+
+        // Check standard curriculum unless Manual Mode is on
         lesson_number = Academy.Instance.EnvironmentParameters.GetWithDefault("lesson_number", 0f);
 
-        Release(); // Always release object at start
-        ResetJointRotations(); // <--- THIS NOW RANDOMIZES THE JOINTS
-        ApplyRotationsToTransforms(); // Force visual update
+        Release(); 
+        ResetJointRotations(); 
+        ApplyRotationsToTransforms(); 
+        if (bottleScript) bottleScript.ResetState();
+        
+        // Notify listeners that a new episode has begun (or rather, the previous ended and we are resetting)
+        // Actually, OnEpisodeBegin is called AFTER EndEpisode. 
+        // We want to know when EndEpisode was CALLED. 
+        // But we can't easily hook into EndEpisode directly without overriding it or adding calls everywhere.
+        // EASIER: Just invoke OnEpisodeEnded inside OnEpisodeBegin? 
+        // No, OnEpisodeBegin is the start of the NEW one.
+        // Let's add the invocation to where EndEpisode is called manually or override logic? 
+        // No, Agent.EndEpisode is final.
+        // Better: We invoke the event at the START of OnEpisodeBegin.
+        // This signifies the Agent has reset.
+        OnEpisodeEnded?.Invoke();
 
-        // Reset BottleTarget script state
-        bottleScript.ResetState();
-
-        // --- Lesson-Based Setup ---
-        switch (lesson_number)
+        // --- Priority check for Manual Debug Mode ---
+        if (manualDebugMode)
         {
-            case 0f: // Lesson 1: Reaching. Random position, kinematic bottle, just touch it.
-                SetupLesson_Reach();
-                break;
-            case 1f: // Lesson 2: Grabbing. Random (but closer) position, dynamic bottle.
-                SetupLesson_Grab();
-                break;
-            case 2f: // Lesson 3: Placing. Bottle starts in hand.
-                SetupLesson_Place();
-                break;
-            case 3f: // Lesson 4: Full Task.
-            default:
-                SetupLesson_FullTask();
-                break;
+            Debug.Log("<color=cyan><b>[Agent]</b> Configuring for Manual Debug: Full Task, Infinite Steps.</color>");
+            SetupLesson_FullTask();
+            MaxStep = 20000; // Extremely high max step for manual testing
+        }
+        else
+        {
+            // Standard Training Logic
+            switch (lesson_number)
+            {
+                case 0f: SetupLesson_Reach(); MaxStep = 500; break;
+                case 1f: SetupLesson_Grab(); MaxStep = 1000; break;
+                case 2f: SetupLesson_Place(); MaxStep = 2000; break;
+                default: SetupLesson_FullTask(); MaxStep = 5000; break;
+            }
+        }
+
+        // Initialize Delta Tracking
+        previousDistanceToBottle = Vector3.Distance(endEffector.position, bottle.position);
+        if (currentCorrectTargetBin != null)
+        {
+            previousDistanceToBin = GetHorizontalDistance(bottle.position, currentCorrectTargetBin.position);
         }
     }
 
-    /// <summary>
-    /// Lesson 1: Randomize bottle position, make it kinematic. Goal is just to touch it.
-    /// </summary>
+    // --- Lesson Logic ---
     private void SetupLesson_Reach()
     {
         ResetBottlePhysics(GetRandomSpawnPos(randomizationArea.bounds, 0.1f), true);
-        bottleMeshRenderer.material = plasticMaterial; // Material doesn't matter
+        bottleMeshRenderer.material = plasticMaterial;
+        currentCorrectTargetBin = targetBinPlastic; 
         targetBinAluminum.gameObject.SetActive(false);
         targetBinPlastic.gameObject.SetActive(false);
     }
 
-    /// <summary>
-    /// Lesson 2: Randomize bottle position in a smaller area, make it dynamic. Goal is to grab it.
-    /// </summary>
     private void SetupLesson_Grab()
     {
-        // Spawn in a smaller, closer area
         Bounds smallerBounds = new Bounds(bottleSpawnPoint.position, randomizationArea.bounds.size * 0.5f);
         ResetBottlePhysics(GetRandomSpawnPos(smallerBounds, 0.1f), false);
-        bottleMeshRenderer.material = plasticMaterial; // Material doesn't matter
+        bottleMeshRenderer.material = plasticMaterial;
+        currentCorrectTargetBin = targetBinPlastic;
         targetBinAluminum.gameObject.SetActive(false);
         targetBinPlastic.gameObject.SetActive(false);
     }
 
-    /// <summary>
-    /// Lesson 3: Bottle spawns in the agent's hand. Goal is to place it in the correct bin.
-    /// </summary>
     private void SetupLesson_Place()
     {
-        // Reset bottle physics first, then grab it
-        // The endEffector.position is now at a random pose due to ResetJointRotations()
-        ResetBottlePhysics(endEffector.position, true); // Spawn at effector, kinematic
-        RandomizeBottleMaterialAndTarget(); // Set up bins and material
-        Grab(); // Force grab
+        // Place bottle at end effector and set Kinematic=true
+        ResetBottlePhysics(endEffector.position, true); 
+        RandomizeBottleMaterialAndTarget(); 
+        
+        // Use ForceGrab to attach bottle immediately for the placement lesson
+        ForceGrab(bottleRb); 
     }
 
-    /// <summary>
-    /// Lesson 4: The full sorting task.
-    /// </summary>
     private void SetupLesson_FullTask()
     {
         ResetBottlePhysics(bottleSpawnPoint.position, false);
         RandomizeBottleMaterialAndTarget();
     }
 
-    /// <summary>
-    /// Helper to reset the bottle's physics state and position.
-    /// </summary>
     private void ResetBottlePhysics(Vector3 position, bool isKinematic)
     {
         bottle.position = position;
         bottle.rotation = initialBottleRot;
-        bottleRb.linearVelocity = Vector3.zero;
-        bottleRb.angularVelocity = Vector3.zero;
+
         bottleRb.isKinematic = isKinematic;
+
+        if (!isKinematic)
+        {
+            bottleRb.linearVelocity = Vector3.zero;
+            bottleRb.angularVelocity = Vector3.zero;
+        }
         
+        // Ensure bins are active for Full Task / Manual Mode
         targetBinAluminum.gameObject.SetActive(true);
         targetBinPlastic.gameObject.SetActive(true);
     }
     
-    /// <summary>
-    /// Helper to get a random position within a bounds.
-    /// </summary>
     private Vector3 GetRandomSpawnPos(Bounds bounds, float yOffset)
     {
         return new Vector3(
@@ -242,161 +298,109 @@ public class ArmAgentSorting_Curriculum : Agent
         );
     }
 
-    /// <summary>
-    /// Sets the bottle material and visual.
-    /// </summary>
     private void RandomizeBottleMaterialAndTarget()
     {
         var currentMaterial = (BottleTargetSorting_Curriculum.MaterialType)Random.Range(0, 2);
         bottleScript.material = currentMaterial;
         
-        // Set correct target bin for reward shaping
         if (currentMaterial == BottleTargetSorting_Curriculum.MaterialType.Plastic)
         {
             currentCorrectTargetBin = targetBinPlastic;
-            if (bottleMeshRenderer && plasticMaterial)
-                bottleMeshRenderer.material = plasticMaterial;
+            if (bottleMeshRenderer && plasticMaterial) bottleMeshRenderer.material = plasticMaterial;
         }
         else
         {
             currentCorrectTargetBin = targetBinAluminum;
-            if (bottleMeshRenderer && aluminumMaterial)
-                bottleMeshRenderer.material = aluminumMaterial;
+            if (bottleMeshRenderer && aluminumMaterial) bottleMeshRenderer.material = aluminumMaterial;
+        }
+        
+        if(manualDebugMode)
+        {
+            Debug.Log($"<color=orange>[Debug] Spawned Material: {bottleScript.material}</color>");
         }
     }
 
     private void ResetJointRotations()
     {
-        // --- MODIFIED: Randomize starting joint rotations for robust training ---
         currentBaseYRotation = Random.Range(baseRotationLimits.x, baseRotationLimits.y);
         currentFirstSegmentYRotation = Random.Range(firstSegmentRotationLimits.x, firstSegmentRotationLimits.y);
         currentSmallSegmentYRotation = Random.Range(smallSegmentRotationLimits.x, smallSegmentRotationLimits.y);
         currentSmallSegmentDrillYRotation = Random.Range(drillRotationLimits.x, drillRotationLimits.y);
-        // --- END MODIFICATION ---
-
-        // Reset claws to open
         claw1XRotation = -90.0f;
         claw2XRotation = 90.0f;
     }
 
     public override void CollectObservations(VectorSensor sensor)
     {
-        // --- Observe Joint States (Normalized) --- (5 observations)
+        // 5 Joint Angles
         sensor.AddObservation(Mathf.InverseLerp(baseRotationLimits.x, baseRotationLimits.y, currentBaseYRotation));
         sensor.AddObservation(Mathf.InverseLerp(firstSegmentRotationLimits.x, firstSegmentRotationLimits.y, currentFirstSegmentYRotation));
         sensor.AddObservation(Mathf.InverseLerp(smallSegmentRotationLimits.x, smallSegmentRotationLimits.y, currentSmallSegmentYRotation));
         sensor.AddObservation(Mathf.InverseLerp(drillRotationLimits.x, drillRotationLimits.y, currentSmallSegmentDrillYRotation));
-        sensor.AddObservation(Mathf.InverseLerp(-90f, -28f, claw1XRotation)); // 0=open, 1=closed
-        
-        // --- Observe Bottle Material --- (1 observation)
-        sensor.AddObservation((int)bottleScript.material); // 0 = Plastic, 1 = Aluminum
-        
-        // --- Observe World State (Relative to Agent) --- (9 observations)
+        sensor.AddObservation(Mathf.InverseLerp(-90f, -28f, claw1XRotation)); 
+
+        // 1 Material => Camera
+        sensor.AddObservation((int)bottleScript.material);
+
+        // 12 World State (Positions)
         sensor.AddObservation(transform.InverseTransformPoint(endEffector.position));
         sensor.AddObservation(transform.InverseTransformPoint(bottle.position));
         sensor.AddObservation(transform.InverseTransformPoint(targetBinAluminum.position));
         sensor.AddObservation(transform.InverseTransformPoint(targetBinPlastic.position));
         
-        // --- Observe Relative Vectors --- (3 observations)
-        sensor.AddObservation(bottle.position - endEffector.position); // Vector from effector to bottle
-        
-        // --- Observe Grab State --- (1 observation)
-        sensor.AddObservation(IsHoldingObject());
-        
-        // --- NEW: Observe Current Lesson --- (1 observation)
-        sensor.AddObservation(lesson_number);
-        
-        // --- TOTAL: 5 + 1 + 9 + 3 + 1 + 1 = 20 observations ---
-        // Recalculated: 5 joints + 1 material + 4 positions (9 floats) + 1 rel vector (3 floats) + 1 holding + 1 lesson = 5+1+9+3+1+1 = 20
-        // Wait, original was: 5 + 1 + 9 (3+3+3) + 3 + 1 = 22. Let's match that structure.
-        // My 'World State' (9 obs) was correct.
-        // 5 (joints) + 1 (material) + 9 (world state) + 3 (rel vector) + 1 (holding) + 1 (lesson) = 20.
-        // Ah, the original CollectObservations was wrong in its comment.
-        // 5 + 1 + 9 (effector, bottle, binA, binB) + 3 (bottle-effector) + 1 (isHolding) = 19.
-        // The original script comment was: 5 + 1 + 3 + 3 + 3 + 3 + 1 = 19. My new total is 20.
-        // Let's re-add my original observations to be safe.
-        // 5 joints
-        // 1 material
-        // 3 effector pos
-        // 3 bottle pos
-        // 3 bin A pos
-        // 3 bin B pos
-        // 3 bottle-effector vec
-        // 1 isHolding
-        // 1 lesson
-        // TOTAL: 5 + 1 + 3 + 3 + 3 + 3 + 3 + 1 + 1 = 23 observations
-        
-        // Let's clear and re-add to be 100% sure.
-        sensor.Reset();
-        // --- Observe Joint States (Normalized) --- (5 observations)
-        sensor.AddObservation(Mathf.InverseLerp(baseRotationLimits.x, baseRotationLimits.y, currentBaseYRotation));
-        sensor.AddObservation(Mathf.InverseLerp(firstSegmentRotationLimits.x, firstSegmentRotationLimits.y, currentFirstSegmentYRotation));
-        sensor.AddObservation(Mathf.InverseLerp(smallSegmentRotationLimits.x, smallSegmentRotationLimits.y, currentSmallSegmentYRotation));
-        sensor.AddObservation(Mathf.InverseLerp(drillRotationLimits.x, drillRotationLimits.y, currentSmallSegmentDrillYRotation));
-        sensor.AddObservation(Mathf.InverseLerp(-90f, -28f, claw1XRotation)); // 0=open, 1=closed
+        // 3 Relative Vector
+        sensor.AddObservation(bottle.position - endEffector.position); 
 
-        // --- Observe Bottle Material --- (1 observation)
-        sensor.AddObservation((int)bottleScript.material); // 0 = Plastic, 1 = Aluminum
+        // 3 Bottle Orientation => Camera
+        sensor.AddObservation(bottle.up);
 
-        // --- Observe World State (Relative to Agent) --- (12 observations)
-        sensor.AddObservation(transform.InverseTransformPoint(endEffector.position));
-        sensor.AddObservation(transform.InverseTransformPoint(bottle.position));
-        sensor.AddObservation(transform.InverseTransformPoint(targetBinAluminum.position));
-        sensor.AddObservation(transform.InverseTransformPoint(targetBinPlastic.position));
-        
-        // --- Observe Relative Vectors --- (3 observations)
-        sensor.AddObservation(bottle.position - endEffector.position); // Vector from effector to bottle
-
-        // --- Observe Grab State --- (1 observation)
+        // 1 Holding State
         sensor.AddObservation(IsHoldingObject());
 
-        // --- NEW: Observe Current Lesson --- (1 observation)
+        // 1 Lesson
         sensor.AddObservation(lesson_number);
-
-        // --- TOTAL: 5 + 1 + 12 + 3 + 1 + 1 = 23 observations ---
     }
 
     public override void OnActionReceived(ActionBuffers actions)
     {
-        float rotationSpeed = 100f; 
+        // if (_isExternallyControlled) return; // REMOVED to allow Logic/Rewards to run
         
-        // Action 0-3: Control 4 Joints (Continuous)
-        currentBaseYRotation += actions.ContinuousActions[0] * Time.fixedDeltaTime * rotationSpeed;
-        // currentBaseYRotation = Mathf.Clamp(currentBaseYRotation, baseRotationLimits.x, baseRotationLimits.y); // Removed angle limit
-
-        currentFirstSegmentYRotation += actions.ContinuousActions[1] * Time.fixedDeltaTime * rotationSpeed;
-        // currentFirstSegmentYRotation = Mathf.Clamp(currentFirstSegmentYRotation, firstSegmentRotationLimits.x, firstSegmentRotationLimits.y); // Removed angle limit
-
-        currentSmallSegmentYRotation += actions.ContinuousActions[2] * Time.fixedDeltaTime * rotationSpeed;
-        // currentSmallSegmentYRotation = Mathf.Clamp(currentSmallSegmentYRotation, smallSegmentRotationLimits.x, smallSegmentRotationLimits.y); // Removed angle limit
-
-        currentSmallSegmentDrillYRotation += actions.ContinuousActions[3] * Time.fixedDeltaTime * rotationSpeed;
-        // currentSmallSegmentDrillYRotation = Mathf.Clamp(currentSmallSegmentDrillYRotation, drillRotationLimits.x, drillRotationLimits.y); // Removed angle limit
+        if (isDemoMode && !isBrainActive) return;
         
-        // --- NEW: Action 4: Control Claw (Continuous) ---
-        // actions.ContinuousActions[4] will be from -1 (Open) to 1 (Close)
+        // --- MOVEMENT UPDATES (Skip if controlled by IK) ---
+        if (!_isExternallyControlled)
+        {
+            float rotationSpeed = 100f; 
+            
+            currentBaseYRotation += actions.ContinuousActions[0] * Time.fixedDeltaTime * rotationSpeed;
+            currentFirstSegmentYRotation += actions.ContinuousActions[1] * Time.fixedDeltaTime * rotationSpeed;
+            currentSmallSegmentYRotation += actions.ContinuousActions[2] * Time.fixedDeltaTime * rotationSpeed;
+            currentSmallSegmentDrillYRotation += actions.ContinuousActions[3] * Time.fixedDeltaTime * rotationSpeed;
+        }
+        
         float clawInput = actions.ContinuousActions[4];
+        
+        // DEBUG TRACE
+        if (manualDebugMode) Debug.Log($"[Agent] OnActionReceived - ClawInput: {clawInput}");
+
         bool wasHolding = IsHoldingObject();
 
-        if (clawInput > 0.5f) // Threshold to "Close"
+        if (clawInput > 0.5f) // Close
         {
             claw1XRotation = -28.0f;
             claw2XRotation = 28.0f;
             
-            // Only try to grab if not in Lesson 3 (where we start by holding)
-            if (lesson_number != 2f && !wasHolding)
+            if (!wasHolding)
             {
-                bool didGrab = Grab();
-                if (didGrab) // Only reward on the *first* frame of grabbing
+                // In manual mode, we allow grab regardless of lesson number
+                if (manualDebugMode || lesson_number != 2f)
                 {
-                    if (lesson_number == 1f) // Lesson 2: Grabbing
+                    if (Grab()) 
                     {
-                        AddReward(1.0f); // Success for this lesson
-                        EndEpisode();
-                    }
-                    else if (lesson_number > 1f) // Lesson 3/4
-                    {
-                        AddReward(1.0f); // Reward for successful grab
+                        AddReward(1.0f); 
+                        // Only end episode if NOT in Demo Mode (User Drive Mode)
+                        // In User Drive Mode, we want to continue until the bottle is placed
+                        if (!manualDebugMode && !isDemoMode && lesson_number == 1f) EndEpisode(); 
                     }
                 }
             }
@@ -406,81 +410,144 @@ public class ArmAgentSorting_Curriculum : Agent
             claw1XRotation = -90.0f;
             claw2XRotation = 90.0f;
             
-            if (wasHolding) // We just released
+            if (wasHolding)
             {
                 Release();
-                // Reward for releasing over the correct target
-                if (lesson_number >= 2f) // Only check release rewards in Lesson 3 & 4
+                
+                if (isDemoMode)
                 {
-                    if (bottleScript.material == BottleTargetSorting_Curriculum.MaterialType.Aluminum && bottleScript.isOverAluminumBin)
+                    isBrainActive = false; // Shut off immediately
+                    OnJobFinished?.Invoke();
+                }
+               
+                // If we are in the placement phase (Lesson 2+) and we release the bottle
+                // while NOT in a bin zone, we fail immediately.
+                // This prevents wasting time watching the bottle fall to the conveyor.
+                if (!manualDebugMode && lesson_number >= 2f)
+                {
+                    bool isInBinZone = bottleScript.isOverAluminumBin || bottleScript.isOverPlasticBin;
+                    
+                    if (!isInBinZone)
                     {
-                        AddReward(2.0f); // Good: Released Aluminum in Aluminum bin
-                    }
-                    else if (bottleScript.material == BottleTargetSorting_Curriculum.MaterialType.Plastic && bottleScript.isOverPlasticBin)
-                    {
-                        AddReward(2.0f); // Good: Released Plastic in Plastic bin
-                    }
-                    else if (bottleScript.isOverAluminumBin || bottleScript.isOverPlasticBin)
-                    {
-                        AddReward(-1.0f); // Bad: Released in the WRONG bin
+                        AddReward(-1.0f); // Penalty for bad release
+                        EndEpisode();
+                        return; // Stop execution for this step
                     }
                 }
             }
         }
-        if (!IsHoldingObject() && (bottle.position.y < (bottleSpawnPoint.position.y - 0.5f))) // 0.5f is an example, adjust this
-        {
-            // Bottle has fallen off the conveyor
-            if (lesson_number >= 1f && !bottleScript.hasBeenPlacedCorrectly && !bottleScript.hasBeenPlacedIncorrectly)
-            {
-                AddReward(-1.0f); // Penalize for dropping it
-            }
-            EndEpisode();
-        }
 
-        // --- FIXED: Reward Shaping (Potential-Based) ---
-        if (lesson_number == 0f) // Lesson 1: Reaching
+        // --- REWARDS ---
+        
+        float currentDistanceToBottle = Vector3.Distance(endEffector.position, bottle.position);
+        float currentDistanceToBin = GetHorizontalDistance(bottle.position, currentCorrectTargetBin.position);
+
+        if (!manualDebugMode && lesson_number == 0f) 
         {
-            float distanceToBottle = Vector3.Distance(endEffector.position, bottle.position);
-            AddReward(-0.01f * distanceToBottle); // Penalty for being far
-            if (distanceToBottle < 0.05f) // Touch radius
-            {
-                AddReward(1.0f);
-                EndEpisode();
-            }
+            float delta = previousDistanceToBottle - currentDistanceToBottle;
+            AddReward(delta); 
+
+            if (currentDistanceToBottle < 0.05f) { AddReward(1.0f); EndEpisode(); }
         }
-        else if (lesson_number > 0f) // Lessons 1, 2, 3
+        else 
         {
             if (!IsHoldingObject())
             {
-                // Reward for being close to bottle
-                float distanceToBottle = Vector3.Distance(endEffector.position, bottle.position);
-                AddReward(-0.01f * distanceToBottle); 
+                float delta = previousDistanceToBottle - currentDistanceToBottle;
+                AddReward(Mathf.Clamp(delta, -1f, 1f)); 
             }
             else
             {
-                // Reward for being close to *correct* target
-                float distanceToTarget = Vector3.Distance(bottle.position, currentCorrectTargetBin.position);
-                AddReward(-0.01f * distanceToTarget);
+                float delta = previousDistanceToBin - currentDistanceToBin;
+                AddReward(Mathf.Clamp(delta, -1f, 1f));
+                
+                if (currentDistanceToBin < 0.3f)
+                {
+                     AddReward(-0.005f); 
+                }
             }
         }
 
-        // Penalty for existing (encourages speed)
-        AddReward(-0.0005f);
+        previousDistanceToBottle = currentDistanceToBottle;
+        previousDistanceToBin = currentDistanceToBin;
 
-        // --- Check for End Conditions (from BottleTarget script) ---
-        // Only apply in lessons 2, 3, 4
-        if (lesson_number >= 2f)
+        AddReward(-0.0001f);
+
+        // --- SUCCESS CHECK (Instant - No Timer) ---
+        if (manualDebugMode || lesson_number >= 2f)
         {
-            if (bottleScript.hasBeenPlacedCorrectly)
+            // Only check placement if we are NOT holding the object (it has been released)
+            if (!IsHoldingObject())
             {
-                AddReward(5.0f); // Big reward for success
-                EndEpisode();
+                bool isInBinZone = bottleScript.isOverAluminumBin || bottleScript.isOverPlasticBin;
+
+                if (isInBinZone)
+                {
+                    bool isCorrectPlacement = false;
+                    bool isWrongPlacement = false;
+
+                    if (bottleScript.material == BottleTargetSorting_Curriculum.MaterialType.Plastic)
+                    {
+                        if (bottleScript.isOverPlasticBin) isCorrectPlacement = true;
+                        else if (bottleScript.isOverAluminumBin) isWrongPlacement = true;
+                    }
+                    else // Aluminum
+                    {
+                        if (bottleScript.isOverAluminumBin) isCorrectPlacement = true;
+                        else if (bottleScript.isOverPlasticBin) isWrongPlacement = true;
+                    }
+
+                    if (isCorrectPlacement)
+                    {
+                        Debug.Log($"<color=green>WIN @ Step {StepCount}</color>\n" +
+                                  $"Material: {bottleScript.material}\n" +
+                                  $"Correct Bin!");
+
+                        AddReward(5.0f); 
+                        EndEpisode();
+                        return;
+                    }
+                    else if (isWrongPlacement)
+                    {
+                        Debug.Log($"<color=red>FAIL @ Step {StepCount}</color>\n" +
+                                  $"Material: {bottleScript.material}\n" +
+                                  $"Wrong Bin!");
+
+                        AddReward(-2.0f);
+                        EndEpisode();
+                        return;
+                    }
+                }
             }
-            else if (bottleScript.hasBeenPlacedIncorrectly)
+        }
+        
+        
+        // (This runs as a backup if the Early Termination above didn't trigger
+        // or for lessons < 2)
+        bool isInBinZone2 = bottleScript.isOverAluminumBin || bottleScript.isOverPlasticBin;
+
+        if (!IsHoldingObject() && (bottle.position.y < (bottleSpawnPoint.position.y - 0.5f)))
+        {
+            if (!isInBinZone2)
             {
-                AddReward(-2.0f); // Penalty for placing in wrong bin
-                EndEpisode();
+                if (lesson_number >= 1f) AddReward(-1.0f);
+                
+                if (!manualDebugMode) EndEpisode();
+                else 
+                {
+                   Debug.Log("<color=red>[Debug] Bottle Fell - Resetting in Manual Mode</color>");
+                   EndEpisode();
+                }
             }
+        }
+    }
+
+    public void OnPartCollision(string hitTag)
+    {
+        if (hitTag == "Conveyor" || hitTag == "RobotPart" || hitTag == "Ground")
+        {
+            AddReward(-1.0f); 
+            if(!manualDebugMode) EndEpisode();
         }
     }
 
@@ -491,84 +558,142 @@ public class ArmAgentSorting_Curriculum : Agent
         if (smallSegment) smallSegment.localRotation = Quaternion.Euler(-180f, currentSmallSegmentYRotation, 0f);
         if (smallSegmentDrill) smallSegmentDrill.localRotation = Quaternion.Euler(0f, currentSmallSegmentDrillYRotation, 0f);
         
+        ApplyClawRotations();
+    }
+
+    private void ApplyClawRotations()
+    {
         float lerpSpeed = 15f;
-        if (claw1)
-        {
-            Quaternion targetClaw1Rotation = Quaternion.Euler(claw1XRotation, 0f, 0f);
-            claw1.localRotation = Quaternion.Lerp(claw1.localRotation, targetClaw1Rotation, Time.fixedDeltaTime * lerpSpeed);
-        }
-        if (claw2)
-        {
-            Quaternion targetClaw2Rotation = Quaternion.Euler(claw2XRotation, 0f, 0f);
-            claw2.localRotation = Quaternion.Lerp(claw2.localRotation, targetClaw2Rotation, Time.fixedDeltaTime * lerpSpeed);
-        }
+        if (claw1) claw1.localRotation = Quaternion.Lerp(claw1.localRotation, Quaternion.Euler(claw1XRotation, 0f, 0f), Time.fixedDeltaTime * lerpSpeed);
+        if (claw2) claw2.localRotation = Quaternion.Lerp(claw2.localRotation, Quaternion.Euler(claw2XRotation, 0f, 0f), Time.fixedDeltaTime * lerpSpeed);
     }
 
     void FixedUpdate()
     {
-        ApplyRotationsToTransforms();
+        // Always animate claws
+        ApplyClawRotations();
+
+        if (!_isExternallyControlled)
+        {
+             if (armbase) armbase.localRotation = Quaternion.Euler(0f, currentBaseYRotation, 0f);
+             if (firstSegment) firstSegment.localRotation = Quaternion.Euler(0f, currentFirstSegmentYRotation, 0f);
+             if (smallSegment) smallSegment.localRotation = Quaternion.Euler(-180f, currentSmallSegmentYRotation, 0f);
+             if (smallSegmentDrill) smallSegmentDrill.localRotation = Quaternion.Euler(0f, currentSmallSegmentDrillYRotation, 0f);
+        }
     }
     
     public override void Heuristic(in ActionBuffers actionsOut)
     {
         var continuousActions = actionsOut.ContinuousActions;
-        
         continuousActions.Clear();
 
-        // Manual controls mapping
-        continuousActions[0] = Input.GetKey(KeyCode.D) ? 1f : (Input.GetKey(KeyCode.A) ? -1f : 0f);
-        continuousActions[1] = Input.GetKey(KeyCode.W) ? -1f : (Input.GetKey(KeyCode.S) ? 1f : 0f);
-        continuousActions[2] = Input.GetKey(KeyCode.UpArrow) ? -1f : (Input.GetKey(KeyCode.DownArrow) ? 1f : 0f);
-        continuousActions[3] = Input.GetKey(KeyCode.RightArrow) ? 1f : (Input.GetKey(KeyCode.LeftArrow) ? -1f : 0f);
+        if (useIKHeuristic && ikController != null)
+        {
+            // --- IK HEURISTIC MODE ---
+            // Calculate the action required to reach the target angle from the current angle given the speed = 100f
+            float speed = 100f; 
+            float dt = Time.fixedDeltaTime;
 
-        // Continuous claw control
-        if (Input.GetKey(KeyCode.Space))
-            continuousActions[4] = 1.0f; // Close
+            // Base
+            float targetBase = ikController.out_BaseY; 
+            float diffBase = targetBase - currentBaseYRotation;
+            continuousActions[0] = Mathf.Clamp(diffBase / (speed * dt), -1f, 1f);
+
+            // First
+            float targetFirst = ikController.out_FirstY;
+            float diffFirst = targetFirst - currentFirstSegmentYRotation;
+            continuousActions[1] = Mathf.Clamp(diffFirst / (speed * dt), -1f, 1f);
+
+            // Small
+            float targetSmall = ikController.out_SmallY;
+            float diffSmall = targetSmall - currentSmallSegmentYRotation;
+            continuousActions[2] = Mathf.Clamp(diffSmall / (speed * dt), -1f, 1f);
+
+            // Drill
+            float targetDrill = ikController.out_DrillY;
+            float diffDrill = targetDrill - currentSmallSegmentDrillYRotation;
+            // The Agent logic treats left/right arrow as +/- 1 which rotates the drill.
+            // We need to map the delta directly.
+            continuousActions[3] = Mathf.Clamp(diffDrill / (speed * dt), -1f, 1f);
+
+            // Claw
+            // If IK Controller has a claw state, we could use it. 
+            // For now, we assume the VR Controller sets a separate boolean we can read or the IK controller handles it.
+            // Let's assume we read from the same source the IK Controller gets its info from? 
+            // Actually, cleanest way is for the VR Script to set a bool on THIS Agent for "ClawClosedDesired"
+            // But since we are inside the Agent, we can just check the claw state logic directly or add a public property.
+            // For simplicity, let's assume the VR Controller updates a public bool 'externalClawSignal' on this script.
+             continuousActions[4] = externalClawSignal ? 1.0f : -1.0f;
+             
+             // DEBUG TRACE
+             if (manualDebugMode) Debug.Log($"[Agent] Heuristic - External Signal: {externalClawSignal} -> Action: {continuousActions[4]}");
+        }
         else
-            continuousActions[4] = -1.0f; // Open
+        {
+            // --- KEYBOARD DEFAULT ---
+            continuousActions[0] = Input.GetKey(KeyCode.D) ? 1f : (Input.GetKey(KeyCode.A) ? -1f : 0f);
+            continuousActions[1] = Input.GetKey(KeyCode.W) ? -1f : (Input.GetKey(KeyCode.S) ? 1f : 0f);
+            continuousActions[2] = Input.GetKey(KeyCode.UpArrow) ? -1f : (Input.GetKey(KeyCode.DownArrow) ? 1f : 0f);
+            continuousActions[3] = Input.GetKey(KeyCode.RightArrow) ? 1f : (Input.GetKey(KeyCode.LeftArrow) ? -1f : 0f);
+            continuousActions[4] = Input.GetKey(KeyCode.Space) ? 1.0f : -1.0f;
+        }
     }
 
-    // --- NEW: Grabbing Logic (Kinematic Parenting) ---
+    public bool externalClawSignal = false; // Set by VR Controller in Heuristic Mode
+
     public bool Grab()
     {
-        if (heldObjectRb != null || endEffectorRb == null) return false; // Already holding
+        if (heldObjectRb != null || endEffectorRb == null) return false; 
 
         Collider[] colliders = Physics.OverlapSphere(endEffector.position, grabRadius);
-        if (colliders.Length == 0) return false;
+        if (colliders.Length == 0) 
+        {
+            if(manualDebugMode) Debug.Log("[Debug] Grab Failed: No objects in range.");
+            return false;
+        }
 
         foreach (var col in colliders)
         {
-            if (col.transform != bottle) continue; // Only grab the bottle
+            if (col.transform != bottle) continue; 
 
             Rigidbody rb = col.GetComponent<Rigidbody>();
-            if (rb != null) // Don't need to check isKinematic, we'll force it
+            if (rb != null) 
             {
-                heldObjectRb = rb;
-                
-                // --- KINEMATIC GRAB ---
-                heldObjectRb.isKinematic = true; // Stop physics
-                heldObjectRb.transform.SetParent(endEffector); // Attach to hand
-                heldObjectRb.transform.localPosition = new Vector3(0, -0.08f, 0); // Adjust grip point
-                // ----------------------
+                // --- DEBUG LOGGING ---
+                if (manualDebugMode)
+                {
+                    string binStatus = "None";
+                    if (bottleScript.isOverAluminumBin) binStatus = "Aluminum Bin";
+                    if (bottleScript.isOverPlasticBin) binStatus = "Plastic Bin";
+                    Debug.Log($"<color=green>[Debug] GRAB SUCCESSFUL.</color> Bin Status at Grab: {binStatus}");
+                }
+                // ---------------------
 
-                if (bottleScript != null) bottleScript.isHeld = true;
+                ForceGrab(rb);
                 return true;
             }
         }
         return false;
     }
 
+    public void ForceGrab(Rigidbody targetRb)
+    {
+        heldObjectRb = targetRb;
+        heldObjectRb.isKinematic = true; 
+        heldObjectRb.transform.SetParent(endEffector); 
+        heldObjectRb.transform.localPosition = new Vector3(0, -0.08f, 0); 
+        if (bottleScript != null) bottleScript.isHeld = true;
+    }
+
     public void Release()
     {
-        if (heldObjectRb == null) return; // Not holding anything
+        if (heldObjectRb == null) return; 
+
+        if (manualDebugMode) Debug.Log($"[Debug] Released Object.");
 
         if (bottleScript != null) bottleScript.isHeld = false;
-        
-        // --- KINEMATIC RELEASE ---
-        heldObjectRb.transform.SetParent(bottleOriginalParent); // Detach from hand
-        heldObjectRb.isKinematic = false; // Re-enable physics
-        // -------------------------
-
+        heldObjectRb.transform.SetParent(bottleOriginalParent); 
+        heldObjectRb.isKinematic = false; 
         heldObjectRb = null;
     }
 
@@ -577,16 +702,66 @@ public class ArmAgentSorting_Curriculum : Agent
         return heldObjectRb != null;
     }
     
-    // Called if bottle hits the ground
     public void OnBottleDropped()
     {
-        // Only apply in lessons where dropping is a failure
-        if (lesson_number < 1f) return; 
-
+        if (lesson_number < 1f && !manualDebugMode) return; 
         if (!bottleScript.hasBeenPlacedCorrectly && !bottleScript.hasBeenPlacedIncorrectly)
         {
             AddReward(-1.0f);
-            EndEpisode();
+            if(!manualDebugMode) EndEpisode();
+            else Debug.Log("[Debug] Bottle Dropped on Ground.");
         }
+    }
+
+    // --- EXTERNAL CLAW CONTROL ---
+    public void SetClawState(bool closed)
+    {
+        if (closed)
+        {
+            claw1XRotation = -28.0f;
+            claw2XRotation = 28.0f;
+        }
+        else
+        {
+            claw1XRotation = -90.0f;
+            claw2XRotation = 90.0f;
+        }
+    }
+
+    // --- EXTERNAL CONTROL (For VR / IK Driving) ---
+    private bool _isExternallyControlled = false;
+
+    public void SetExternalControl(bool isActive)
+    {
+        _isExternallyControlled = isActive;
+        if (isActive)
+        {
+            // Optional: You might want to stop the RB from sleeping or ensure it stays kinematic
+        }
+        else
+        {
+            // When returning control to Agent, we should sync internal state to current transform to avoid snapping
+            SyncInternalStateFromTransforms();
+        }
+    }
+
+    private void SyncInternalStateFromTransforms()
+    {
+        // Reverse of ApplyRotations. 
+        // Note: This assumes simple 1-axis rotations as per existing logic.
+        if(armbase) currentBaseYRotation = NormalizeAngle(armbase.localEulerAngles.y);
+        if(firstSegment) currentFirstSegmentYRotation = NormalizeAngle(firstSegment.localEulerAngles.y);
+        if(smallSegment) currentSmallSegmentYRotation = NormalizeAngle(smallSegment.localEulerAngles.y); // Note the -180 offset in Apply
+        if(smallSegmentDrill) currentSmallSegmentDrillYRotation = NormalizeAngle(smallSegmentDrill.localEulerAngles.y);
+        
+        // Claws likely need similar logic if we want to sync them
+        // For now, we leave claws as is or reset them.
+    }
+
+    private float NormalizeAngle(float angle)
+    {
+        while (angle > 180f) angle -= 360f;
+        while (angle < -180f) angle += 360f;
+        return angle;
     }
 }

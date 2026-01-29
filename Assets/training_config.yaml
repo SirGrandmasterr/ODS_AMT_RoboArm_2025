@@ -21,54 +21,43 @@ behaviors:
         strength: 1.0
     max_steps: 10000000
     time_horizon: 64
-    summary_freq: 50000
-
-# Define the curriculum via environment parameters.
-
-# Ensure your Unity environment reads "lesson_number"
-
-# (e.g., Academy.Instance.EnvironmentParameters.GetWithDefault("lesson_number", 0.0))
+    summary_freq: 10000
 
 environment_parameters:
   lesson_number:
     curriculum:
-
       - name: Lesson1_Reach
-
         completion_criteria:
           measure: reward
           behavior: RoboArm
-          threshold: 0.8
+          threshold: 1.5 # Increased because Delta Rewards sum to positive
           min_lesson_length: 100
           signal_smoothing: true
         value: 0.0
 
       - name: Lesson2_Grab
-
         completion_criteria:
           measure: reward
           behavior: RoboArm
-          threshold: 0.8
+          threshold: 2.2 # ~1.5 (Reach) + 1.0 (Grab)
           min_lesson_length: 100
           signal_smoothing: true
         value: 1.0
 
       - name: Lesson3_Place
-
         completion_criteria:
           measure: reward
           behavior: RoboArm
-          threshold: 4.0
+          threshold: 5.85 # High threshold to ensure precision placement
           min_lesson_length: 100
           signal_smoothing: true
         value: 2.0
 
       - name: Lesson4_FullTask
-
         completion_criteria:
           measure: reward
           behavior: RoboArm
-          threshold: 4.5
+          threshold: 7.0
           min_lesson_length: 100
           signal_smoothing: true
         value: 3.0

@@ -113,9 +113,22 @@ namespace Unity.MLAgents.Demonstrations
                 return;
             }
 
+            // --- STRICT ONE EPISODE ENFORCEMENT ---
+            // If we have already completed 1 episode (numberEpisodes >= 1), 
+            // we actively ignore any subsequent steps (like the start of the next episode)
+            // until this writer is fully closed and a new one is created.
+            if (m_MetaData.numberEpisodes >= 1)
+            {
+                return;
+            }
+            // --------------------------------------
+
             // Increment meta-data counters.
             m_MetaData.numberSteps++;
             m_CumulativeReward += info.reward;
+            
+            // If this step finishes the episode, EndEpisode() increments numberEpisodes to 1.
+            // The NEXT call to Record() will be caught by the check above.
             if (info.done)
             {
                 EndEpisode();
@@ -143,8 +156,24 @@ namespace Unity.MLAgents.Demonstrations
                 return;
             }
 
-            EndEpisode();
-            m_MetaData.meanReward = m_CumulativeReward / m_MetaData.numberEpisodes;
+            // FIX: Only increment episode count if we haven't finished one yet.
+            // If the agent finished naturally, numberEpisodes is already 1.
+            // Calling EndEpisode() again causes the episode count to jump to 2, halving the mean reward.
+            if (m_MetaData.numberEpisodes == 0)
+            {
+                EndEpisode();
+            }
+            
+            // Avoid division by zero if closed immediately
+            if (m_MetaData.numberEpisodes > 0)
+            {
+                m_MetaData.meanReward = m_CumulativeReward / m_MetaData.numberEpisodes;
+            }
+            else
+            {
+                m_MetaData.meanReward = 0;
+            }
+            
             WriteMetadata();
             m_Writer.Close();
             m_Writer = null;
@@ -155,7 +184,9 @@ namespace Unity.MLAgents.Demonstrations
         /// </summary>
         void EndEpisode()
         {
-            m_MetaData.numberEpisodes += 1;
+            // Only increment if we haven't already (prevent double count on Close() if called after done)
+            // But standard ML-Agents logic calls this often, so we rely on the Record check to gate it.
+             m_MetaData.numberEpisodes += 1;
         }
     }
 }
