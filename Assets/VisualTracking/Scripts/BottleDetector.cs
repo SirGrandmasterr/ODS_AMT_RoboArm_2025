@@ -9,16 +9,10 @@ public class BottleDetector : MonoBehaviour
     // The "Bottle" class is index 39 in COCO dataset
     private const int BOTTLE_CLASS_INDEX = 39;
 
-    // Struct to hold a potential detection
-    public struct Detection
-    {
-        public Rect box;
-        public float score;
-    }
-
     // Call this after you get your float[] results
-    public static Rect GetBottlePosition(float[] results)
+    public static Detection GetBottlePosition(float[] results)
     {
+
         List<Detection> candidates = new List<Detection>();
 
         int numAnchors = 8400;
@@ -50,7 +44,8 @@ public class BottleDetector : MonoBehaviour
                 candidates.Add(new Detection
                 {
                     box = new Rect(xMin, yMin, w, h),
-                    score = score
+                    score = score,
+                    isValid = w > 0 && h > 0
                 });
             }
         }
@@ -63,10 +58,10 @@ public class BottleDetector : MonoBehaviour
         if (finalDetections.Count > 0)
         {
             // Return the highest scoring bottle
-            return finalDetections.OrderByDescending(d => d.score).First().box;
+            return finalDetections.OrderByDescending(d => d.score).First();
         }
 
-        return Rect.zero; // No bottle found
+        return null; // No bottle found
     }
 
     // The "Magic" Math function to clean up duplicates

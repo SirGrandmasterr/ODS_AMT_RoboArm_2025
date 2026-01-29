@@ -1,8 +1,27 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public static class VisualTrackingTriangulator
 {
 
+    public static Vector3 GetWorldPosition(List<Detection> detections, float fallbackHeight, bool visualize)
+    {
+        List<Ray> rays = new List<Ray>();
+        List<float> scores = new List<float>();
+
+        foreach (var detection in detections)
+        {
+            Vector2 center = detection.box.center;
+            float u = center.x / 640; // Assuming model size is 640
+            float v = 1.0f - (center.y / 640); // Flip Y
+
+            Ray ray = detection.camera.ViewportPointToRay(new Vector3(u, v, 0));
+            rays.Add(ray);
+            scores.Add(detection.score);
+        }
+
+        return GetWorldPosition(rays, scores, fallbackHeight, visualize);
+    }
     public static Vector3 GetWorldPosition(Rect detectionBox, Camera visionCamera, float height, int modelSize)
     {
         // 1. Get the center of the box (in Model Pixels, e.g., 0 to 640)
@@ -30,6 +49,51 @@ public static class VisualTrackingTriangulator
         return Vector3.zero;
     }
 
+    public static Vector3 GetWorldPosition(List<Ray> rays, List<float> scores, float fallbackHeight, bool visualize)
+    {
+        if (rays == null || rays.Count == 0) return Vector3.zero;
+
+        // Case 1: Single Camera -> 2D -> 3D via Plane Intersection
+        if (rays.Count == 1)
+        {
+            // Use the fallback height (last known Y) to intersect the single ray
+            Plane tablePlane = new Plane(Vector3.up, new Vector3(0, fallbackHeight, 0));
+            float dist;
+            if (tablePlane.Raycast(rays[0], out dist))
+            {
+                Vector3 worldPos = rays[0].GetPoint(dist);
+                if (visualize) Debug.DrawLine(rays[0].origin, worldPos, Color.red);
+                return worldPos;
+            }
+            return Vector3.zero;
+        }
+
+        // Case 2: Multi-Camera -> Triangulate all pairs and average
+        Vector3 sumPoints = Vector3.zero;
+        int pairCount = 0;
+
+        for (int i = 0; i < rays.Count; i++)
+        {
+            for (int j = i + 1; j < rays.Count; j++)
+            {
+                Vector3 p = CalculateTriangulation(rays[i], rays[j], visualize);
+                if (p != Vector3.zero)
+                {
+                    sumPoints += p;
+                    pairCount++;
+                }
+            }
+        }
+
+        if (pairCount > 0)
+        {
+            return sumPoints / pairCount;
+        }
+
+        return Vector3.zero;
+    }
+
+    // Kept for backward compatibility or direct calls
     public static Vector3 GetWorldPosition(Rect boxA, Rect boxB, Camera camA, Camera camB, int modelSize, bool visualize)
     {
         // Calculate Rays for both cameras
@@ -74,8 +138,6 @@ public static class VisualTrackingTriangulator
 
         Vector3 p1_p2 = p1 - p2;
 
-        float s = Vector3.Dot(Vector3.Cross(d2, n), p1_p2) / n2;
-
         float v1v1 = Vector3.Dot(d1, d1);
         float v1v2 = Vector3.Dot(d1, d2);
         float v2v2 = Vector3.Dot(d2, d2);
@@ -85,6 +147,14 @@ public static class VisualTrackingTriangulator
         float det = v1v1 * v2v2 - v1v2 * v1v2;
 
         if (Mathf.Abs(det) < 0.0001f) return Vector3.zero;
+
+        // Formula for closest point on two lines (Symbolic solution)
+        // s = (b*e - c*d) / D
+        // t = (a*e - b*d) / D
+        // a=v1v1, b=v1v2, c=v2v2, d=v1_p2p1, e=v2_p2p1
+
+        // s_numer = v1v2 * v2_p2p1 - v2v2 * v1_p2p1
+        // t_numer = v1v1 * v2_p2p1 - v1v2 * v1_p2p1
 
         float s_numer = v2v2 * v1_p2p1 - v1v2 * v2_p2p1;
         float t_numer = v1v2 * v1_p2p1 - v1v1 * v2_p2p1;

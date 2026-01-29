@@ -1,18 +1,21 @@
+using System.Collections.Generic;
+using System.Linq;
 using Unity.InferenceEngine;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class VisualTrackingController : MonoBehaviour
 {
     public Vector3 LastDetectedBottlePosition { get; private set; }
 
-    [SerializeField] private Camera _camera1;
-    [SerializeField] private Camera _camera2;
+    [SerializeField] private List<Camera> _cameras = new List<Camera>();
+
+    [Header("Model")]
     [SerializeField] private ModelAsset _modelAsset;
 
     private Model _runtimeModel;
     private Worker _worker;
-    private RenderTexture _renderTexture1;
-    private RenderTexture _renderTexture2;
+    private List<RenderTexture> _renderTextures = new List<RenderTexture>();
 
     [Header("Settings")]
     [SerializeField] private bool normalizeInputTo255 = false; // Toggle to multiply input by 255
@@ -22,14 +25,14 @@ public class VisualTrackingController : MonoBehaviour
 
     [Header("Static Image")]
     [SerializeField] private bool useStaticImage = false;
-    [SerializeField] private Texture2D testImage; // Drag your downloaded bottle.jpg here
+    [SerializeField] private Texture2D testImage;
 
     [Header("Visualization")]
     [SerializeField] private bool visualize = false;
-    [SerializeField] private UnityEngine.UI.RawImage debugView1;
-    [SerializeField] private UnityEngine.UI.RawImage debugView2;
+    [SerializeField] private List<RawImage> _debugViews = new List<RawImage>();
 
     const int MODEL_SIZE = 640;
+
 
 
     private void Start()
@@ -37,8 +40,10 @@ public class VisualTrackingController : MonoBehaviour
         LoadModel();
         SetupRenderTextures();
 
-        debugView1.gameObject.SetActive(visualize);
-        debugView2.gameObject.SetActive(visualize);
+        foreach (var debugView in _debugViews)
+        {
+            debugView.gameObject.SetActive(visualize);
+        }
     }
 
     private void LoadModel()
@@ -49,11 +54,11 @@ public class VisualTrackingController : MonoBehaviour
 
     private void SetupRenderTextures()
     {
-        _renderTexture1 = new RenderTexture(MODEL_SIZE, MODEL_SIZE, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-        _camera1.targetTexture = _renderTexture1;
-
-        _renderTexture2 = new RenderTexture(MODEL_SIZE, MODEL_SIZE, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-        _camera2.targetTexture = _renderTexture2;
+        for (int i = 0; i < _cameras.Count; i++)
+        {
+            _renderTextures.Add(new RenderTexture(MODEL_SIZE, MODEL_SIZE, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB));
+            _cameras[i].targetTexture = _renderTextures[i];
+        }
     }
 
     private void Update()
@@ -68,40 +73,46 @@ public class VisualTrackingController : MonoBehaviour
         float[] result = ProcessCameraImage(texture);
         VisualTrackingDebugger.LogMaxConfidence(result, 39); // Log max confidence for bottle class
 
-        Rect box = BottleDetector.GetBottlePosition(result);
+        // Rect box = BottleDetector.GetBottlePosition(result);
     }
 
     private void ProcessCameraImages()
     {
-        // Camera 1
-        float[] result1 = ProcessCameraImage(_renderTexture1);
-        float[] result2 = ProcessCameraImage(_renderTexture2);
+        List<Detection> detections = new List<Detection>();
 
-        Rect box1 = BottleDetector.GetBottlePosition(result1);
-        Rect box2 = BottleDetector.GetBottlePosition(result2);
-
-        bool hasBox1 = box1.width > 0 && box1.height > 0;
-        bool hasBox2 = box2.width > 0 && box2.height > 0;
-
-        if (hasBox1 && hasBox2)
+        for (int i = 0; i < _cameras.Count; i++)
         {
-            // TRIANGULATION
-            Vector3 worldPos = VisualTrackingTriangulator.GetWorldPosition(box1, box2, _camera1, _camera2, MODEL_SIZE, visualize);
-            LastDetectedBottlePosition = worldPos;
+            Camera cam = _cameras[i];
+            RenderTexture renderTexture = _renderTextures[i];
 
-            if (visualize)
-            {
-                Debug.DrawLine(_camera1.transform.position, worldPos, Color.green);
-                Debug.DrawLine(_camera2.transform.position, worldPos, Color.green);
-                Debug.Log($"[Tracking] Triangulated: {worldPos} vs. Real: {_bottle.transform.position}");
-            }
+            float[] result = ProcessCameraImage(renderTexture);
+            Detection detection = BottleDetector.GetBottlePosition(result);
+
+            if (detection == null) continue;
+
+            detection.renderTexture = renderTexture;
+            detection.camera = cam;
+            detection.cameraIndex = i;
+
+            if (detection.isValid) detections.Add(detection);
+        }
+
+        Vector3 worldPos = VisualTrackingTriangulator.GetWorldPosition(detections, LastDetectedBottlePosition.y, visualize);
+
+        if (worldPos == Vector3.zero)
+        {
+            Debug.Log($"[Tracking] No valid triangulation. Available detections was {detections.Count}");
         }
 
         // VISUALIZATION
         if (visualize)
         {
-            VisualTrackingDebugger.UpdateDebugViewWithBox(debugView1, _renderTexture1, box1, Color.green, MODEL_SIZE);
-            VisualTrackingDebugger.UpdateDebugViewWithBox(debugView2, _renderTexture2, box2, Color.green, MODEL_SIZE);
+            foreach (var detection in detections)
+            {
+                Debug.DrawLine(detection.camera.transform.position, worldPos, Color.green);
+                VisualTrackingDebugger.UpdateDebugViewWithBox(_debugViews[detection.cameraIndex], detection.renderTexture, detection.box, Color.green, MODEL_SIZE);
+            }
+            Debug.Log($"[Tracking] Triangulated: {worldPos} vs. Real: {_bottle.transform.position} | Confidences: [{string.Join(",", detections.Select(d => d.score.ToString("F2")))}]");
         }
     }
 
@@ -144,8 +155,10 @@ public class VisualTrackingController : MonoBehaviour
     void OnDestroy()
     {
         _worker?.Dispose();
-        if (_renderTexture1 != null) _renderTexture1.Release();
-        if (_renderTexture2 != null) _renderTexture2.Release();
+        foreach (var renderTexture in _renderTextures)
+        {
+            if (renderTexture != null) renderTexture.Release();
+        }
     }
 
 }
