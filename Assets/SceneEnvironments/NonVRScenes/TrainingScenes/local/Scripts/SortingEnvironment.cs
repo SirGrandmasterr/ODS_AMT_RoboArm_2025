@@ -25,11 +25,11 @@ public class SortingEnvironment : MonoBehaviour
     public BoxCollider randomizationArea;
     public Material plasticMaterial;
     public Material aluminumMaterial;
-    
+
     // Internal State
     public float CurrentLessonNumber { get; private set; }
     public Transform CurrentCorrectTargetBin { get; private set; }
-    
+
     private Quaternion initialBottleRot;
 
     private Bounds spawnBounds;
@@ -38,7 +38,7 @@ public class SortingEnvironment : MonoBehaviour
     {
         if (bottle) initialBottleRot = bottle.rotation;
         if (bottleRb) bottleRb.sleepThreshold = 0.0f;
-        
+
         if (randomizationArea)
         {
             spawnBounds = randomizationArea.bounds;
@@ -74,9 +74,9 @@ public class SortingEnvironment : MonoBehaviour
         Bounds smallerBounds = new Bounds(bottleSpawnPoint.position, spawnBounds.size * 0.5f);
         ResetBottlePhysics(GetRandomSpawnPos(smallerBounds, 0.1f), false);
         SetBottleMaterial(BottleTargetSorting_Curriculum.MaterialType.Plastic);
-        
-        if(targetBinAluminum) targetBinAluminum.gameObject.SetActive(false);
-        if(targetBinPlastic) targetBinPlastic.gameObject.SetActive(false);
+
+        if (targetBinAluminum) targetBinAluminum.gameObject.SetActive(false);
+        if (targetBinPlastic) targetBinPlastic.gameObject.SetActive(false);
     }
 
     private void SetupLesson_Grab()
@@ -87,29 +87,29 @@ public class SortingEnvironment : MonoBehaviour
         ResetBottlePhysics(GetRandomSpawnPos(smallerBounds, 0.1f), false);
         SetBottleMaterial(BottleTargetSorting_Curriculum.MaterialType.Plastic);
 
-        if(targetBinAluminum) targetBinAluminum.gameObject.SetActive(false);
-        if(targetBinPlastic) targetBinPlastic.gameObject.SetActive(false);
+        if (targetBinAluminum) targetBinAluminum.gameObject.SetActive(false);
+        if (targetBinPlastic) targetBinPlastic.gameObject.SetActive(false);
     }
 
     private void SetupLesson_Place(Transform agentEndEffector = null)
     {
         // Lesson 2: Place - Starts held by agent (or at agent pos). 
-        
+
         // Strategy: Reset to Spawn Point, but ensure bins are active.
         ResetBottlePhysics(bottleSpawnPoint.position, true);
         RandomizeBottleMaterialAndTarget();
-        
-        if(targetBinAluminum) targetBinAluminum.gameObject.SetActive(true);
-        if(targetBinPlastic) targetBinPlastic.gameObject.SetActive(true);
+
+        if (targetBinAluminum) targetBinAluminum.gameObject.SetActive(true);
+        if (targetBinPlastic) targetBinPlastic.gameObject.SetActive(true);
     }
 
     private void SetupLesson_FullTask()
     {
         ResetBottlePhysics(bottleSpawnPoint.position, false);
         RandomizeBottleMaterialAndTarget();
-        
-        if(targetBinAluminum) targetBinAluminum.gameObject.SetActive(true);
-        if(targetBinPlastic) targetBinPlastic.gameObject.SetActive(true);
+
+        if (targetBinAluminum) targetBinAluminum.gameObject.SetActive(true);
+        if (targetBinPlastic) targetBinPlastic.gameObject.SetActive(true);
     }
 
     // --- Helper Methods ---
@@ -126,7 +126,7 @@ public class SortingEnvironment : MonoBehaviour
             bottleRb.angularVelocity = Vector3.zero;
             bottleRb.WakeUp();
         }
-        
+
         // Reset hierarchy if it was held
         if (bottleOriginalParent) bottle.SetParent(bottleOriginalParent);
     }
@@ -143,7 +143,7 @@ public class SortingEnvironment : MonoBehaviour
     private void SetBottleMaterial(BottleTargetSorting_Curriculum.MaterialType matType)
     {
         if (bottleScript) bottleScript.material = matType;
-        
+
         if (matType == BottleTargetSorting_Curriculum.MaterialType.Plastic)
         {
             CurrentCorrectTargetBin = targetBinPlastic;
@@ -161,7 +161,7 @@ public class SortingEnvironment : MonoBehaviour
         var matType = (BottleTargetSorting_Curriculum.MaterialType)Random.Range(0, 2);
         SetBottleMaterial(matType);
     }
-    
+
     // --- Public Query API ---
 
     public bool IsInBinZone()
