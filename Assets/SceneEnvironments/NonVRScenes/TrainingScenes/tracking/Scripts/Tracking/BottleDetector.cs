@@ -29,7 +29,7 @@ public class BottleDetector : MonoBehaviour
             // Get Bottle Score (Row 43)
             float score = results[43 * numAnchors + i];
 
-            if (score > 0.01f) // Threshold
+            if (score > 0.00001f) // Threshold
             {
                 // Decode Box (Row 0,1,2,3)
                 float x = results[0 * numAnchors + i];

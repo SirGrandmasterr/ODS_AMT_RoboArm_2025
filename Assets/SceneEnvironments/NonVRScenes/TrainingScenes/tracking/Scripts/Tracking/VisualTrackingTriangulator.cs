@@ -165,6 +165,12 @@ public static class VisualTrackingTriangulator
         Vector3 closestPoint1 = p1 + final_s * d1;
         Vector3 closestPoint2 = p2 + final_t * d2;
 
+        if (Vector3.Distance(closestPoint1, closestPoint2) > 0.1f)
+        {
+            // If the closest points are too far apart, we might want to discard this pair. One detection might be wrong
+            return Vector3.zero;
+        }
+
         return (closestPoint1 + closestPoint2) * 0.5f;
     }
 }

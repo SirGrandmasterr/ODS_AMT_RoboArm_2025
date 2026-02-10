@@ -86,7 +86,7 @@ environment_parameters:
     - value:
         sampler_type: constant
         sampler_parameters:
-          seed: 6138
+          seed: 5277
           value: 3.0
       name: Lesson4_FullTask
       completion_criteria:
@@ -100,8 +100,8 @@ checkpoint_settings:
   run_id: IKTrainingEike
   initialize_from: null
   load_model: false
-  resume: false
-  force: true
+  resume: true
+  force: false
   train_model: false
   inference: false
   results_dir: results

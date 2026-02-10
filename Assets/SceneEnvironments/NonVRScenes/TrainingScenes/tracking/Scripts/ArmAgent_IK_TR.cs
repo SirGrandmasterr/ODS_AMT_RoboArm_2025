@@ -493,6 +493,7 @@ public class ArmAgent_IK_TR : Agent
 
     private Vector3 GetBottlePosition(bool returnGroundTruth = false)
     {
+        if (environment.bottleScript.isHeld && !returnGroundTruth && enableVisualTracking) return endEffector.position;
         // return environment.bottle.position;
         return enableVisualTracking && !returnGroundTruth ? visualTrackingController.LastDetectedBottlePosition : environment.bottle.position;
     }

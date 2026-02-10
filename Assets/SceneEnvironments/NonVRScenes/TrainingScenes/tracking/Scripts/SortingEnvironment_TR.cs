@@ -52,7 +52,7 @@ public class SortingEnvironment_TR : MonoBehaviour
     /// </summary>
     public void ResetEnvironment()
     {
-        CurrentLessonNumber = Academy.Instance.EnvironmentParameters.GetWithDefault("lesson_number", 0f);
+        CurrentLessonNumber = Academy.Instance.EnvironmentParameters.GetWithDefault("lesson_number", 4f);
 
         if (bottleScript) bottleScript.ResetState();
 
