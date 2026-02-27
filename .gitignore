@@ -105,3 +105,6 @@ InitTestScene*.unity*
 *.sublime-workspace
 ..swp
 ..swo
+
+.DS_Store
+**/DS_Store
