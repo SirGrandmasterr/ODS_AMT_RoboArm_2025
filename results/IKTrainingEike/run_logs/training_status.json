@@ -1,0 +1,68 @@
+{
+    "lesson_number": {
+        "lesson_num": 0
+    },
+    "RoboArmIK": {
+        "checkpoints": [
+            {
+                "steps": 509629,
+                "file_path": "results/IKTrainingEike/RoboArmIK/RoboArmIK-509629.onnx",
+                "reward": 8.196485769601516,
+                "creation_time": 1769770391.937483,
+                "auxillary_file_paths": [
+                    "results/IKTrainingEike/RoboArmIK/RoboArmIK-509629.pt"
+                ]
+            },
+            {
+                "steps": 999998,
+                "file_path": "results/IKTrainingEike/RoboArmIK/RoboArmIK-999998.onnx",
+                "reward": 8.403934452021234,
+                "creation_time": 1769946513.4416618,
+                "auxillary_file_paths": [
+                    "results/IKTrainingEike/RoboArmIK/RoboArmIK-999998.pt"
+                ]
+            },
+            {
+                "steps": 1499980,
+                "file_path": "results/IKTrainingEike/RoboArmIK/RoboArmIK-1499980.onnx",
+                "reward": 8.416000564893087,
+                "creation_time": 1769947434.165042,
+                "auxillary_file_paths": [
+                    "results/IKTrainingEike/RoboArmIK/RoboArmIK-1499980.pt"
+                ]
+            },
+            {
+                "steps": 1999997,
+                "file_path": "results/IKTrainingEike/RoboArmIK/RoboArmIK-1999997.onnx",
+                "reward": 8.461826548095821,
+                "creation_time": 1769948380.342912,
+                "auxillary_file_paths": [
+                    "results/IKTrainingEike/RoboArmIK/RoboArmIK-1999997.pt"
+                ]
+            },
+            {
+                "steps": 2119760,
+                "file_path": "results/IKTrainingEike/RoboArmIK/RoboArmIK-2119760.onnx",
+                "reward": 8.467944672418168,
+                "creation_time": 1769948625.4739158,
+                "auxillary_file_paths": [
+                    "results/IKTrainingEike/RoboArmIK/RoboArmIK-2119760.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 2119760,
+            "file_path": "results/IKTrainingEike/RoboArmIK.onnx",
+            "reward": 8.467944672418168,
+            "creation_time": 1769948625.4739158,
+            "auxillary_file_paths": [
+                "results/IKTrainingEike/RoboArmIK/RoboArmIK-2119760.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.1.0",
+        "torch_version": "2.2.2"
+    }
+}

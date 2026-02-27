@@ -22,16 +22,16 @@ behaviors:
       gail:
         gamma: 0.9
         strength: 0.1
-        demo_path: ../../Demonstrations/Sorting_Session_20260126_163919_ik # Ensure this matches where files are saved
+        demo_path: Assets/Demonstrations/Sorting_Session_20260126_163919_ik # Ensure this matches where files are saved
         use_vail: true
         use_actions: true
-        
+
     #behavioral_cloning:
     #  strength: 0.5
     #  steps: 50000 # Decay BC over first 500k steps
     #  demo_path: ../../Demonstrations/Sorting_Session_20260126_163919_ik  #C:\Users\vogle\Gitstuff\uni\ODS_AMT_RoboArm_2025\Assets\Demonstrations\SortingDemoUserI.demo
     max_steps: 5000000
-    time_horizon: 64 
+    time_horizon: 64
     summary_freq: 10000
 
 environment_parameters:

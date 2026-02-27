@@ -11,7 +11,7 @@ public class ArmAgent_RL : Agent
     [Header("Environment Connection")]
     [Tooltip("Drag the SortingEnvironment object here.")]
     [SerializeField] private SortingEnvironment environment;
-    
+
     [Header("Initialization Config")]
     [SerializeField] private InitializationConfig initConfig;
 
@@ -43,10 +43,10 @@ public class ArmAgent_RL : Agent
     private float currentSmallSegmentDrillYRotation;
     private float claw1XRotation;
     private float claw2XRotation;
-    
+
     // Grabbing State
-    private Rigidbody heldObjectRb; 
-    
+    private Rigidbody heldObjectRb;
+
     // Reward Tracking
     private float previousDistanceToBottle;
     private float previousDistanceToBin;
@@ -58,7 +58,7 @@ public class ArmAgent_RL : Agent
         {
             // First try finding it on this object
             environment = GetComponent<SortingEnvironment>();
-            
+
             // Then try finding it globally (fallback)
             if (environment == null)
             {
@@ -75,7 +75,7 @@ public class ArmAgent_RL : Agent
         // 2. Check Joints
         if (armbase == null || firstSegment == null || smallSegment == null || smallSegmentDrill == null)
         {
-             Debug.LogError($"<color=red><b>[ArmAgent_RL] ERROR:</b> One or more Arm Joints (Transforms) are not assigned in the Inspector!</color>", this);
+            Debug.LogError($"<color=red><b>[ArmAgent_RL] ERROR:</b> One or more Arm Joints (Transforms) are not assigned in the Inspector!</color>", this);
         }
 
         // 3. Setup DecisionRequester if needed (Auto-added by RequireComponent, but ensure settings)
@@ -86,11 +86,11 @@ public class ArmAgent_RL : Agent
         {
             if (endEffectorRb == null) endEffectorRb = endEffector.GetComponent<Rigidbody>();
             if (endEffectorRb == null) endEffectorRb = endEffector.gameObject.AddComponent<Rigidbody>();
-            endEffectorRb.isKinematic = true; 
+            endEffectorRb.isKinematic = true;
         }
-        
+
         if (initConfig == null) initConfig = GetComponent<InitializationConfig>();
-        
+
         // Safety: Ensure MaxStep is not 0 (infinite)
         if (MaxStep == 0) MaxStep = 5000;
     }
@@ -131,7 +131,7 @@ public class ArmAgent_RL : Agent
         sensor.AddObservation(Mathf.InverseLerp(firstSegmentRotationLimits.x, firstSegmentRotationLimits.y, currentFirstSegmentYRotation));
         sensor.AddObservation(Mathf.InverseLerp(smallSegmentRotationLimits.x, smallSegmentRotationLimits.y, currentSmallSegmentYRotation));
         sensor.AddObservation(Mathf.InverseLerp(drillRotationLimits.x, drillRotationLimits.y, currentSmallSegmentDrillYRotation));
-        sensor.AddObservation(Mathf.InverseLerp(-90f, -28f, claw1XRotation)); 
+        sensor.AddObservation(Mathf.InverseLerp(-90f, -28f, claw1XRotation));
 
         // 1 Material
         sensor.AddObservation((int)environment.bottleScript.material);
@@ -141,9 +141,9 @@ public class ArmAgent_RL : Agent
         sensor.AddObservation(transform.InverseTransformPoint(environment.bottle.position));
         sensor.AddObservation(transform.InverseTransformPoint(environment.targetBinAluminum.position));
         sensor.AddObservation(transform.InverseTransformPoint(environment.targetBinPlastic.position));
-        
+
         // 3 Relative Vector
-        sensor.AddObservation(environment.bottle.position - endEffector.position); 
+        sensor.AddObservation(environment.bottle.position - endEffector.position);
 
         // 3 Bottle Orientation
         sensor.AddObservation(environment.bottle.up);
@@ -158,14 +158,14 @@ public class ArmAgent_RL : Agent
     public override void OnActionReceived(ActionBuffers actions)
     {
         // --- 1. MOVEMENT ---
-        float rotationSpeed = 300f; 
+        float rotationSpeed = 300f;
         float dt = Time.fixedDeltaTime;
-        
+
         currentBaseYRotation += actions.ContinuousActions[0] * dt * rotationSpeed;
         currentFirstSegmentYRotation += actions.ContinuousActions[1] * dt * rotationSpeed;
         currentSmallSegmentYRotation += actions.ContinuousActions[2] * dt * rotationSpeed;
         currentSmallSegmentDrillYRotation += actions.ContinuousActions[3] * dt * rotationSpeed;
-        
+
         float clawInput = actions.ContinuousActions[4];
         bool wasHolding = IsHoldingObject();
 
@@ -173,7 +173,7 @@ public class ArmAgent_RL : Agent
         {
             claw1XRotation = -28.0f;
             claw2XRotation = 28.0f;
-            
+
             if (!wasHolding)
             {
                 // Grab Logic
@@ -191,7 +191,7 @@ public class ArmAgent_RL : Agent
         {
             claw1XRotation = -90.0f;
             claw2XRotation = 90.0f;
-            
+
             if (wasHolding)
             {
                 Release();
@@ -217,24 +217,24 @@ public class ArmAgent_RL : Agent
         }
         else // Grab / Place / Full
         {
-             if (!IsHoldingObject())
-             {
-                 float delta = previousDistanceToBottle - currentDistanceToBottle;
-                 AddReward(Mathf.Clamp(delta, -1f, 1f)); 
-             }
-             else
-             {
-                 float delta = previousDistanceToBin - currentDistanceToBin;
-                 AddReward(Mathf.Clamp(delta, -1f, 1f));
-                 
-                 // Penalty if very close to bin but still holding? (Encourage release)
-                 if (currentDistanceToBin < 0.3f) AddReward(-0.005f); 
-             }
+            if (!IsHoldingObject())
+            {
+                float delta = previousDistanceToBottle - currentDistanceToBottle;
+                AddReward(Mathf.Clamp(delta, -1f, 1f));
+            }
+            else
+            {
+                float delta = previousDistanceToBin - currentDistanceToBin;
+                AddReward(Mathf.Clamp(delta, -1f, 1f));
+
+                // Penalty if very close to bin but still holding? (Encourage release)
+                if (currentDistanceToBin < 0.3f) AddReward(-0.005f);
+            }
         }
-        
+
         previousDistanceToBottle = currentDistanceToBottle;
         previousDistanceToBin = currentDistanceToBin;
-        
+
         // Time Penalty
         AddReward(-0.0001f);
 
@@ -265,9 +265,9 @@ public class ArmAgent_RL : Agent
             // If it fell and wasn't in a bin
             if (!environment.IsInBinZone())
             {
-                 if (environment.CurrentLessonNumber >= 1f) AddReward(-1.0f);
-                 Debug.Log($"<color=red>[ArmAgent_RL] FAILED: Bottle fell out of bounds. Reward: {GetCumulativeReward():F2}</color>");
-                 EndEpisode();
+                if (environment.CurrentLessonNumber >= 1f) AddReward(-1.0f);
+                Debug.Log($"<color=red>[ArmAgent_RL] FAILED: Bottle fell out of bounds. Reward: {GetCumulativeReward():F2}</color>");
+                EndEpisode();
             }
         }
     }
@@ -276,7 +276,7 @@ public class ArmAgent_RL : Agent
     {
         if (hitTag == "Conveyor" || hitTag == "RobotPart" || hitTag == "Ground")
         {
-            AddReward(-1.0f); 
+            AddReward(-1.0f);
             Debug.Log($"<color=orange>[ArmAgent_RL] COLLISION FAIL: Hit {hitTag}</color>");
             EndEpisode();
         }
@@ -290,7 +290,7 @@ public class ArmAgent_RL : Agent
     }
 
     // --- Helpers ---
-    
+
     private void ResetJointRotations()
     {
         if (initConfig != null)
@@ -307,19 +307,19 @@ public class ArmAgent_RL : Agent
             currentSmallSegmentYRotation = Random.Range(smallSegmentRotationLimits.x, smallSegmentRotationLimits.y);
             currentSmallSegmentDrillYRotation = Random.Range(drillRotationLimits.x, drillRotationLimits.y);
         }
-        
+
         claw1XRotation = -90.0f;
         claw2XRotation = 90.0f;
     }
 
     private void ApplyRotationsToTransforms()
     {
-         if (armbase) armbase.localRotation = Quaternion.Euler(0f, currentBaseYRotation, 0f);
-         if (firstSegment) firstSegment.localRotation = Quaternion.Euler(0f, currentFirstSegmentYRotation, 0f);
-         if (smallSegment) smallSegment.localRotation = Quaternion.Euler(-180f, currentSmallSegmentYRotation, 0f);
-         if (smallSegmentDrill) smallSegmentDrill.localRotation = Quaternion.Euler(0f, currentSmallSegmentDrillYRotation, 0f);
+        if (armbase) armbase.localRotation = Quaternion.Euler(0f, currentBaseYRotation, 0f);
+        if (firstSegment) firstSegment.localRotation = Quaternion.Euler(0f, currentFirstSegmentYRotation, 0f);
+        if (smallSegment) smallSegment.localRotation = Quaternion.Euler(-180f, currentSmallSegmentYRotation, 0f);
+        if (smallSegmentDrill) smallSegmentDrill.localRotation = Quaternion.Euler(0f, currentSmallSegmentDrillYRotation, 0f);
     }
-    
+
     private void ApplyClawRotations()
     {
         float lerpSpeed = 15f;
@@ -347,19 +347,19 @@ public class ArmAgent_RL : Agent
     private void ForceGrab(Rigidbody targetRb)
     {
         heldObjectRb = targetRb;
-        heldObjectRb.isKinematic = true; 
-        heldObjectRb.transform.SetParent(endEffector); 
-        heldObjectRb.transform.localPosition = new Vector3(0, -0.08f, 0); 
+        heldObjectRb.isKinematic = true;
+        heldObjectRb.transform.SetParent(endEffector);
+        heldObjectRb.transform.localPosition = new Vector3(0, -0.08f, 0);
         if (environment.bottleScript) environment.bottleScript.isHeld = true;
     }
 
     private void Release()
     {
         if (heldObjectRb == null) return;
-        
+
         if (environment.bottleScript) environment.bottleScript.isHeld = false;
         heldObjectRb.transform.SetParent(environment.bottleOriginalParent);
-        heldObjectRb.isKinematic = false; 
+        heldObjectRb.isKinematic = false;
         heldObjectRb = null;
     }
 

@@ -11,7 +11,7 @@ public class ArmAgent_IK : Agent
     [Header("Environment Connection")]
     [Tooltip("Drag the SortingEnvironment object here.")]
     [SerializeField] private SortingEnvironment environment;
-    
+
     [Header("Initialization Config")]
     [SerializeField] private InitializationConfig initConfig;
 
@@ -30,7 +30,7 @@ public class ArmAgent_IK : Agent
     [SerializeField] private Transform endEffector;
 
     [Header("Motion Settings")]
-    [SerializeField] private float moveSpeed = 1.0f; 
+    [SerializeField] private float moveSpeed = 1.0f;
     [SerializeField] private float rotationSpeed = 300f;
     [SerializeField] private BoxCollider workspaceBounds;
 
@@ -43,14 +43,14 @@ public class ArmAgent_IK : Agent
     private float currentSmallSegmentDrillYRotation;
     private float claw1XRotation;
     private float claw2XRotation;
-    
+
     // Grabbing State
-    private Rigidbody heldObjectRb; 
-    
+    private Rigidbody heldObjectRb;
+
     // Reward Tracking
     private float previousDistanceToBottle;
     private float previousDistanceToBin;
-    
+
     private int defaultMaxStep;
 
     // Execution Safety
@@ -68,10 +68,10 @@ public class ArmAgent_IK : Agent
         // 2. Check IK Controller
         if (ikController == null)
             ikController = GetComponent<RobotArm_IK_Controller>();
-            
+
         if (ikController == null)
-             Debug.LogError($"<color=red><b>[ArmAgent_IK] ERROR:</b> RobotArm_IK_Controller not assigned!</color>", this);
-        
+            Debug.LogError($"<color=red><b>[ArmAgent_IK] ERROR:</b> RobotArm_IK_Controller not assigned!</color>", this);
+
         // 2.5 Check Init Config
         if (initConfig == null) initConfig = GetComponent<InitializationConfig>();
 
@@ -80,13 +80,13 @@ public class ArmAgent_IK : Agent
         {
             if (endEffectorRb == null) endEffectorRb = endEffector.GetComponent<Rigidbody>();
             if (endEffectorRb == null) endEffectorRb = endEffector.gameObject.AddComponent<Rigidbody>();
-            endEffectorRb.isKinematic = true; 
+            endEffectorRb.isKinematic = true;
         }
-        
+
         // Safety
         if (MaxStep == 0) MaxStep = 500;
         defaultMaxStep = MaxStep;
-        
+
         // Init state
         claw1XRotation = -90.0f;
         claw2XRotation = 90.0f;
@@ -116,29 +116,29 @@ public class ArmAgent_IK : Agent
 
         // 2. Reset Robot State (via Forward Kinematics first, then IK Sync)
         ResetAndApplyJointRotations(); // This resets arm joints
-        
+
         // Reset Claw State based on Lesson
-        if (environment.CurrentLessonNumber == 2f) 
+        if (environment.CurrentLessonNumber == 2f)
         {
-             // Start Closed for "Place" lesson
-             claw1XRotation = -28.0f;
-             claw2XRotation = 28.0f;
+            // Start Closed for "Place" lesson
+            claw1XRotation = -28.0f;
+            claw2XRotation = 28.0f;
         }
         else
         {
-             // Start Open
-             claw1XRotation = -90.0f;
-             claw2XRotation = 90.0f;
+            // Start Open
+            claw1XRotation = -90.0f;
+            claw2XRotation = 90.0f;
         }
-        
+
         // NOW read the physical position to set the IK Target
         // This ensures smoothness and respects the InitializationConfig
         currentTargetPosition = endEffector.position;
-        
+
         // Teleport there physically first
         ikController.SetLiveTarget(currentTargetPosition, currentSmallSegmentDrillYRotation);
-        
-        Release(); 
+
+        Release();
 
         // 3. Lesson Handling - Force Grab
         if (environment.bottleRb != null && environment.CurrentLessonNumber == 2.0f)
@@ -167,16 +167,16 @@ public class ArmAgent_IK : Agent
         sensor.AddObservation(transform.InverseTransformPoint(environment.bottle.position));
         sensor.AddObservation(transform.InverseTransformPoint(environment.targetBinAluminum.position));
         sensor.AddObservation(transform.InverseTransformPoint(environment.targetBinPlastic.position));
-        
+
         // 3 Relative Vector to target
-        sensor.AddObservation(environment.bottle.position - endEffector.position); 
+        sensor.AddObservation(environment.bottle.position - endEffector.position);
 
         // 1 Holding State
         sensor.AddObservation(IsHoldingObject());
 
         // 1 Lesson
         sensor.AddObservation(environment.CurrentLessonNumber);
-        
+
         // 3 IK Target Error (Optional, helps agent know where it's trying to go vs where it is)
         sensor.AddObservation(currentTargetPosition - endEffector.position);
 
@@ -197,7 +197,7 @@ public class ArmAgent_IK : Agent
         float moveX = actions.ContinuousActions[0];
         float moveY = actions.ContinuousActions[1];
         float moveZ = actions.ContinuousActions[2];
-        
+
         Vector3 moveDelta = new Vector3(moveX, moveY, moveZ) * moveSpeed * dt;
         currentTargetPosition += moveDelta;
 
@@ -213,7 +213,7 @@ public class ArmAgent_IK : Agent
 
         // Apply to IK Controller
         ikController.SetLiveTarget(currentTargetPosition, currentSmallSegmentDrillYRotation);
-        
+
         // Updates the claw transforms manually (visual only, logic is below)
         ApplyClawRotations();
 
@@ -233,13 +233,13 @@ public class ArmAgent_IK : Agent
         {
             claw1XRotation = -28.0f;
             claw2XRotation = 28.0f;
-            
+
             if (!wasHolding)
             {
                 if (TryGrab())
                 {
                     AddReward(2.0f);
-                    if (environment.CurrentLessonNumber == 1f) 
+                    if (environment.CurrentLessonNumber == 1f)
                     {
                         FinishEpisode(true, "Lesson 1 Success: Grabbed Bottle");
                     }
@@ -250,7 +250,7 @@ public class ArmAgent_IK : Agent
         {
             claw1XRotation = -90.0f;
             claw2XRotation = 90.0f;
-            
+
             if (wasHolding)
             {
                 Release();
@@ -276,23 +276,23 @@ public class ArmAgent_IK : Agent
         }
         else // Grab / Place / Full
         {
-             if (!IsHoldingObject())
-             {
-                 float delta = previousDistanceToBottle - currentDistanceToBottle;
-                 AddReward(Mathf.Clamp(delta, -1f, 1f)); 
-             }
-             else
-             {
-                 float delta = previousDistanceToBin - currentDistanceToBin;
-                 AddReward(Mathf.Clamp(delta, -1f, 1f));
-                 
-                 if (currentDistanceToBin < 0.3f) AddReward(-0.005f); 
-             }
+            if (!IsHoldingObject())
+            {
+                float delta = previousDistanceToBottle - currentDistanceToBottle;
+                AddReward(Mathf.Clamp(delta, -1f, 1f));
+            }
+            else
+            {
+                float delta = previousDistanceToBin - currentDistanceToBin;
+                AddReward(Mathf.Clamp(delta, -1f, 1f));
+
+                if (currentDistanceToBin < 0.3f) AddReward(-0.005f);
+            }
         }
-        
+
         previousDistanceToBottle = currentDistanceToBottle;
         previousDistanceToBin = currentDistanceToBin;
-        
+
         AddReward(-0.0001f); // Time Penalty
 
         // --- 4. SUCCESS/FAIL CHECKS ---
@@ -318,8 +318,8 @@ public class ArmAgent_IK : Agent
         {
             if (!environment.IsInBinZone())
             {
-                 if (environment.CurrentLessonNumber >= 1f) AddReward(-1.0f);
-                 FinishEpisode(false, "Failure: Bottle Fell Out of Bounds");
+                if (environment.CurrentLessonNumber >= 1f) AddReward(-1.0f);
+                FinishEpisode(false, "Failure: Bottle Fell Out of Bounds");
             }
         }
 
@@ -366,9 +366,9 @@ public class ArmAgent_IK : Agent
         float lesson = environment != null ? environment.CurrentLessonNumber : 0f;
         string result = success ? "SUCCESS" : "FAILURE";
         string color = success ? "green" : "red";
-        
+
         Debug.Log($"<color={color}>[ArmAgent_IK] Episode Finished. Lesson: {lesson} | Result: {result} | Reward: {reward:F2} | Steps: {steps} | Reason: {reason}</color>");
-        
+
         EndEpisode();
     }
 
@@ -390,28 +390,28 @@ public class ArmAgent_IK : Agent
         else
         {
             // Fallback safe defaults
-             baseY = 0f;
-             firstY = -45f;
-             smallY = -45f;
-             drillY = 0f;
+            baseY = 0f;
+            firstY = -45f;
+            smallY = -45f;
+            drillY = 0f;
         }
 
         // Apply immediately
         if (armbase) armbase.localRotation = Quaternion.Euler(0f, baseY, 0f);
         if (firstSegment) firstSegment.localRotation = Quaternion.Euler(0f, firstY, 0f);
-        
+
         // Note: Small Segment usually has -180 offset in this setup, check RobotArm_IK_Controller.UpdateFKValues
         // Controller uses: smallSegment.localRotation = Quaternion.Euler(-180f, currentSmallSegmentYRotation, 0f);
         // So we must apply that offset here too.
         if (smallSegment) smallSegment.localRotation = Quaternion.Euler(-180f, smallY, 0f);
-        
+
         if (smallSegmentDrill) smallSegmentDrill.localRotation = Quaternion.Euler(0f, drillY, 0f);
-        
+
         // Sync State Variables
         currentSmallSegmentDrillYRotation = drillY;
-        
+
         // IMPORTANT: Force Unity to update transforms so EndEffector position is valid immediately
-        Physics.SyncTransforms(); 
+        Physics.SyncTransforms();
     }
 
     private void ApplyClawRotations()
@@ -440,19 +440,19 @@ public class ArmAgent_IK : Agent
     private void ForceGrab(Rigidbody targetRb)
     {
         heldObjectRb = targetRb;
-        heldObjectRb.isKinematic = true; 
-        heldObjectRb.transform.SetParent(endEffector); 
-        heldObjectRb.transform.localPosition = new Vector3(0, -0.08f, 0); 
+        heldObjectRb.isKinematic = true;
+        heldObjectRb.transform.SetParent(endEffector);
+        heldObjectRb.transform.localPosition = new Vector3(0, -0.08f, 0);
         if (environment.bottleScript) environment.bottleScript.isHeld = true;
     }
 
     private void Release()
     {
         if (heldObjectRb == null) return;
-        
+
         if (environment.bottleScript) environment.bottleScript.isHeld = false;
         heldObjectRb.transform.SetParent(environment.bottleOriginalParent);
-        heldObjectRb.isKinematic = false; 
+        heldObjectRb.isKinematic = false;
         heldObjectRb = null;
     }
 
@@ -464,7 +464,7 @@ public class ArmAgent_IK : Agent
     public override void Heuristic(in ActionBuffers actionsOut)
     {
         var continuousActions = actionsOut.ContinuousActions;
-        
+
         // Map WASD and QE to XYZ movement
         float moveX = 0f;
         float moveY = 0f;
@@ -472,10 +472,10 @@ public class ArmAgent_IK : Agent
 
         if (Input.GetKey(KeyCode.D)) moveX = 1f;
         if (Input.GetKey(KeyCode.A)) moveX = -1f;
-        
+
         if (Input.GetKey(KeyCode.W)) moveZ = 1f;
         if (Input.GetKey(KeyCode.S)) moveZ = -1f;
-        
+
         if (Input.GetKey(KeyCode.Q)) moveY = 1f;
         if (Input.GetKey(KeyCode.E)) moveY = -1f;
 
