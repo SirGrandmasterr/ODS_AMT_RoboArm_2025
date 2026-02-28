@@ -7,7 +7,7 @@
    1. `TrainingEnvironment` > `VisualTracking`
       1. Enabled = true
       2. Cameras = <list_of_the_3_child_cameras>
-      3. ModelAsset = yolov8x.onnx
+      3. ModelAsset = yolov8x.onnx (from the folder `Models/Tracking`)
       4. Normalize Input to 255 = false
       5. Bottle = Bottle
       6. Use Static Image = false
