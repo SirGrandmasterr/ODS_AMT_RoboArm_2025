@@ -1887,6 +1887,10 @@ PrefabInstance:
       propertyPath: aluminumMaterial
       value: 
       objectReference: {fileID: 2100000, guid: d1cdc66e8d83f4233afca6f97d1178d1, type: 2}
+    - target: {fileID: 919952997224377134, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 3.778
+      objectReference: {fileID: 0}
     - target: {fileID: 1160200461495910991, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: m_LocalPosition.x
       value: 3.0933418
@@ -2010,7 +2014,7 @@ PrefabInstance:
     - target: {fileID: 3050439615340450170, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: _modelAsset
       value: 
-      objectReference: {fileID: 5022602860645237092, guid: 2a4967e59838641959a23fcec3cb50df, type: 3}
+      objectReference: {fileID: 5022602860645237092, guid: 20007408904939143a977baad4a19bba, type: 3}
     - target: {fileID: 3050439615340450170, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: '_debugViews.Array.data[0]'
       value: 
@@ -2113,7 +2117,7 @@ PrefabInstance:
       objectReference: {fileID: 1310776520}
     - target: {fileID: 6582233312279891984, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: enableVisualTracking
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8552036377467522366, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: m_Mesh
