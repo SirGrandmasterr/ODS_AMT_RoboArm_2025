@@ -2120,7 +2120,8 @@ PrefabInstance:
       value: TrainingEnvironment
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 8497691587465413529, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
