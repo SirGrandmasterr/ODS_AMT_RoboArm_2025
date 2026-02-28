@@ -135,7 +135,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &273327043
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -149,7 +149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Sp
   trainingEnvPrefab: {fileID: 8649758128340703085, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
-  totalEnvironmentCount: 10
+  totalEnvironmentCount: 1
   gridSize: 6
   spacing: 10
 --- !u!4 &273327044
@@ -389,13 +389,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 409110388}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0.7071068, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: 0.19, y: 0.869, z: -0.158}
+  m_LocalRotation: {x: 0.067079246, y: -0.49438727, z: 0.03830331, w: 0.8658028}
+  m_LocalPosition: {x: 0.745, y: 0.969, z: 26.066}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2346774973935421103}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 8.86, y: -59.454, z: 0}
 --- !u!114 &409110392
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1961,7 +1961,7 @@ PrefabInstance:
       objectReference: {fileID: 481336545}
     - target: {fileID: 1725906320690453323, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2006643823505809430, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: m_Model
@@ -2010,7 +2010,7 @@ PrefabInstance:
     - target: {fileID: 3050439615340450170, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: _modelAsset
       value: 
-      objectReference: {fileID: 5022602860645237092, guid: 3e550c18882e6448b887e320ee627911, type: 3}
+      objectReference: {fileID: 5022602860645237092, guid: 2a4967e59838641959a23fcec3cb50df, type: 3}
     - target: {fileID: 3050439615340450170, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: '_debugViews.Array.data[0]'
       value: 
@@ -2109,7 +2109,7 @@ PrefabInstance:
       objectReference: {fileID: 1310776520}
     - target: {fileID: 6582233312279891984, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: enableVisualTracking
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8552036377467522366, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: m_Mesh

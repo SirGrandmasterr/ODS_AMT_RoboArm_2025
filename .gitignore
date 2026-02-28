@@ -108,3 +108,5 @@ InitTestScene*.unity*
 
 .DS_Store
 **/.DS_Store
+**/yolov8x.*
+yolov8x.*
