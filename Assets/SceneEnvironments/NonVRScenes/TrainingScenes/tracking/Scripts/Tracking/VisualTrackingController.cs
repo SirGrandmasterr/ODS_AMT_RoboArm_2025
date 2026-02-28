@@ -38,17 +38,31 @@ public class VisualTrackingController : MonoBehaviour
     private int count = 0;
     private bool _isProcessing = false;
 
+    private bool _isInitialized = false;
+
     private void Start()
     {
-        LoadModel();
-        SetupRenderTextures();
-
-        foreach (var debugView in _debugViews)
+        try
         {
-            debugView.gameObject.SetActive(visualize);
-        }
+            LoadModel();
+            SetupRenderTextures();
 
-        startTime = Time.time;
+            foreach (var debugView in _debugViews)
+            {
+                if (debugView != null)
+                {
+                    debugView.gameObject.SetActive(visualize);
+                }
+            }
+
+            startTime = Time.time;
+            _isInitialized = true;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[Tracking] Initialization failed: {e.Message}\n{e.StackTrace}");
+            enabled = false;
+        }
     }
 
     private void LoadModel()
@@ -62,12 +76,21 @@ public class VisualTrackingController : MonoBehaviour
         for (int i = 0; i < _cameras.Count; i++)
         {
             _renderTextures.Add(new RenderTexture(MODEL_SIZE, MODEL_SIZE, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB));
-            _cameras[i].targetTexture = _renderTextures[i];
+            if (_cameras[i] != null)
+            {
+                _cameras[i].targetTexture = _renderTextures[i];
+            }
+            else
+            {
+                Debug.LogWarning($"[Tracking] Camera at index {i} is null.");
+            }
         }
     }
 
     private void Update()
     {
+        if (!_isInitialized) return;
+
         if (visualize)
         {
             float offset = 0.05f;
@@ -115,7 +138,11 @@ public class VisualTrackingController : MonoBehaviour
             string output = "";
             for (int i = 0; i < _cameras.Count; i++)
             {
+                if (i >= _renderTextures.Count) continue;
+                
                 Camera cam = _cameras[i];
+                if (cam == null) continue;
+
                 RenderTexture renderTexture = _renderTextures[i];
 
                 // 1. Run Inference (Async Readback)

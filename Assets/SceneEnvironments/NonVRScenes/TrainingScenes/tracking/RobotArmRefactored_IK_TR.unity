@@ -1966,7 +1966,7 @@ PrefabInstance:
     - target: {fileID: 2006643823505809430, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: m_Model
       value: 
-      objectReference: {fileID: 5022602860645237092, guid: 62a9b295b5b7f4151ac67cb05b729c2a, type: 3}
+      objectReference: {fileID: 5022602860645237092, guid: e76a41d1dd825aa4da9cc83dd0e6bc65, type: 3}
     - target: {fileID: 2006643823505809430, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: m_Enabled
       value: 1
@@ -2100,6 +2100,10 @@ PrefabInstance:
       value: -0.15536366
       objectReference: {fileID: 0}
     - target: {fileID: 6582233312279891984, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
+      propertyPath: MaxStep
+      value: 500
+      objectReference: {fileID: 0}
+    - target: {fileID: 6582233312279891984, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: m_Enabled
       value: 1
       objectReference: {fileID: 0}
@@ -2109,7 +2113,7 @@ PrefabInstance:
       objectReference: {fileID: 1310776520}
     - target: {fileID: 6582233312279891984, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: enableVisualTracking
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8552036377467522366, guid: ac07bbf6418cc8e40bca263cec42728d, type: 3}
       propertyPath: m_Mesh
